@@ -121,11 +121,11 @@ void Motor_Argument(void)
     Speed_Goal_l = 300;
     Speed_Goal_r = 300;
 
-    Speed_P_l = 18;
+    Speed_P_l = 5;
     Speed_I_l = 1.65f;
     Speed_D_l = 1;
 
-    Speed_P_r = 18;
+    Speed_P_r = 5;
     Speed_I_r = 1.65f;
     Speed_D_r = 1;
 }

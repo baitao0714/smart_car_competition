@@ -1,3 +1,0 @@
-/mnt/hgfs/VirtualShare/Intelligent_Car/Loongson_2K300_301_LIB_new/main/build/CMakeFiles/main.dir
-/mnt/hgfs/VirtualShare/Intelligent_Car/Loongson_2K300_301_LIB_new/main/build/CMakeFiles/edit_cache.dir
-/mnt/hgfs/VirtualShare/Intelligent_Car/Loongson_2K300_301_LIB_new/main/build/CMakeFiles/rebuild_cache.dir
