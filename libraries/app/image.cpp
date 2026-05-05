@@ -225,39 +225,39 @@ static void Image_Process()
 
 void Data_Settings(void)
 {
-  ImageStatus.MiddleLine = ImageSensorMid;
-  ImageStatus.TowPoint_Gain = 0.2;
-  ImageStatus.TowPoint_Offset_Max = 5;
-  ImageStatus.TowPoint_Offset_Min = -2;
-  ImageStatus.TowPointAdjust_v = 160;
-  ImageStatus.Det_all_k = 0.7f;
-  ImageStatus.CirquePass = 'F';
-  ImageStatus.IsCinqueOutIn = 'F';
-  ImageStatus.CirqueOut = 'F';
-  ImageStatus.CirqueOff = 'F';
-  ImageStatus.Barn_Flag = 0;
-  ImageStatus.straight_acc = 0;
-  ImageStatus.TowPoint = 21;
-  ImageStatus.Threshold_static = 70;
-  ImageStatus.Threshold_detach = 180;
-  ImageStatus.variance_acc = 25;
-  ImageStatus.newblue_flag = 0;
-  ImageStatus.Road_type = Normol;
-  ImageStatus.Det_True = ImageStatus.MiddleLine;
-  ImageStatus.OFFLine = 2;
-  ImageStatus.WhiteLine = 0;
-  ImageStatus.Left_Line = 0;
-  ImageStatus.Right_Line = 0;
+  ImageStatus.MiddleLine = ImageSensorMid;       // 图像中线基准列
+  ImageStatus.TowPoint_Gain = 0.2;               // 双点法前瞻增益
+  ImageStatus.TowPoint_Offset_Max = 5;           // 双点偏移上限
+  ImageStatus.TowPoint_Offset_Min = -2;          // 双点偏移下限
+  ImageStatus.TowPointAdjust_v = 160;            // 双点前瞻速度调整参考值
+  ImageStatus.Det_all_k = 0.7f;                  // 综合误差融合系数
+  ImageStatus.CirquePass = 'F';                  // 环岛通过状态标志
+  ImageStatus.IsCinqueOutIn = 'F';               // 环岛出入状态标志
+  ImageStatus.CirqueOut = 'F';                   // 环岛出口状态标志
+  ImageStatus.CirqueOff = 'F';                   // 环岛偏离状态标志
+  ImageStatus.Barn_Flag = 0;                     // 车库状态标志
+  ImageStatus.straight_acc = 0;                  // 直道累计计数/状态
+  ImageStatus.TowPoint = 50;                     // 前瞻行位置21
+  ImageStatus.Threshold_static = 70;             // 固定二值化阈值
+  ImageStatus.Threshold_detach = 180;            // 阈值分离上界
+  ImageStatus.variance_acc = 25;                 // 方差累计阈值
+  ImageStatus.newblue_flag = 0;                  // 蓝色标志位
+  ImageStatus.Road_type = Normol;                // 初始赛道类型
+  ImageStatus.Det_True = ImageStatus.MiddleLine; // 当前有效中心线
+  ImageStatus.OFFLine = 2;                       // 丢线保护行
+  ImageStatus.WhiteLine = 0;                     // 白线计数
+  ImageStatus.Left_Line = 0;                     // 左线检测标志
+  ImageStatus.Right_Line = 0;                    // 右线检测标志
 
-  ImageScanInterval = 2;
-  ImageScanInterval_Cross = 2;
+  ImageScanInterval = 2;         // 常规行边界扫描半径
+  ImageScanInterval_Cross = 2;   // 十字/特殊路段扫描半径
 
-  SystemData.clrcle_num = 0;
-  SystemData.Stop = 1;
-  SystemData.straighet_towpoint = 30;
+  SystemData.clrcle_num = 0;         // 环岛计数清零
+  SystemData.Stop = 1;               // 初始停止标志
+  SystemData.straighet_towpoint = 30; // 直道前瞻参考值
 
-  border_point = 0;
-  top_point = 0;
+  border_point = 0;  // 边界特征点计数清零
+  top_point = 0;     // 顶点特征点计数清零
 }
 
 void cleanup(void)

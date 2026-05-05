@@ -25,7 +25,12 @@
 int main()
 {
 #if LQ_APP_TARGET == LQ_APP_CAR_RUNTIME
-    (void)CarRuntime_RunCameraLoop(true, 160, 120, 120, 1000, 20 * 1000, 20 * 1000);
+    #if defined(CAR_RUNTIME_HAS_UDP)
+        (void)CarRuntime_RunCameraLoop(true, 160, 120, 120, 1000, 20 * 1000, 20 * 1000,
+                                true, "192.168.193.117", 8080, 30, 33);
+    #else
+        (void)CarRuntime_RunCameraLoop(true, 160, 120, 120, 1000, 20 * 1000, 20 * 1000);
+    #endif
 #elif LQ_DEMO_TARGET == LQ_DEMO_GPIO_OUTPUT
     lq_log_info("Run demo: GPIO output");
     lq_gpio_output_demo();

@@ -84,15 +84,15 @@ int Speed_PID_OUT_r = 0;
 int Speed_Lasterro_r = 0;
 int Speed_Preverro_r = 0;
 
-int PWM_Max = 5000;
-int PWM_Min = -5000;
+int PWM_Max = 4000;
+int PWM_Min = 0;  //-5000
 int16_t Speed_Begin = 80;
 int16_t Speed_Expect = 0;
 float Diff_Speed_error = 0;
 int16_t Diff_SpeedL_expect = 0;
 int16_t Diff_SpeedR_expect = 0;
-float Diff_Kp = 10.242f;
-float Diff_Kd = 10.274f;
+float Diff_Kp = 10.242f;   //10.242
+float Diff_Kd = 0.274f;
 uint8_t stop_flag = 0;
 
 float Encoder_Left1(void)
@@ -118,15 +118,15 @@ void Encoder_Test1(void)
 
 void Motor_Argument(void)
 {
-    Speed_Goal_l = 300;
-    Speed_Goal_r = 300;
+    Speed_Goal_l = 180;
+    Speed_Goal_r = 180;
 
-    Speed_P_l = 5;
-    Speed_I_l = 1.65f;
+    Speed_P_l = 7;
+    Speed_I_l = 0.3f; //1.65f;
     Speed_D_l = 1;
 
-    Speed_P_r = 5;
-    Speed_I_r = 1.65f;
+    Speed_P_r = 7;
+    Speed_I_r = 0.4f;
     Speed_D_r = 1;
 }
 
@@ -206,18 +206,18 @@ void Motor_Control(void)
     }
     else
     {
-        Speed_Goal_l = 300;
-        Speed_Goal_r = 300;
+        Speed_Goal_l = 180;
+        Speed_Goal_r = 180;
 
         if (top_point < 15)
         {
-            Speed_Goal_l = 300;
-            Speed_Goal_r = 300;
+            Speed_Goal_l = 180;
+            Speed_Goal_r = 180;
         }
         else
         {
-            Speed_Goal_l = 300;
-            Speed_Goal_r = 300;
+            Speed_Goal_l = 180;
+            Speed_Goal_r = 180;
         }
     }
 
@@ -295,13 +295,13 @@ void Motor_Diff_Pid1(void)
     static float last_turn_error = 0;
 
     float turn_error = ImageStatus.Det_True - (float)ImageStatus.MiddleLine;
-    if (turn_error > -2.0f && turn_error < 2.0f)
+    if (turn_error > -2.0f && turn_error < 2.0f)   //需要注意，这个范围需要根据实际情况调整，过大可能导致小幅度偏差时过度修正，过小可能导致无法修正较大的偏差
     {
         turn_error = 0;
     }
 
     float current_Kp = Diff_Kp;
-    if (turn_error > -10.0f && turn_error < 10.0f)
+    if (turn_error > -10.0f && turn_error < 10.0f)  //同样需要根据实际情况调整这个范围，过大可能导致在较大偏差时过度修正，过小可能导致无法修正较大的偏差
     {
         current_Kp = Diff_Kp * 0.6f;
     }
