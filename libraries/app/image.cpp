@@ -237,7 +237,7 @@ void Data_Settings(void)
   ImageStatus.CirqueOff = 'F';                   // 环岛偏离状态标志
   ImageStatus.Barn_Flag = 0;                     // 车库状态标志
   ImageStatus.straight_acc = 0;                  // 直道累计计数/状态
-  ImageStatus.TowPoint = 50;                     // 前瞻行位置21
+  ImageStatus.TowPoint = 14;                     // 前瞻行位置21
   ImageStatus.Threshold_static = 70;             // 固定二值化阈值
   ImageStatus.Threshold_detach = 180;            // 阈值分离上界
   ImageStatus.variance_acc = 25;                 // 方差累计阈值

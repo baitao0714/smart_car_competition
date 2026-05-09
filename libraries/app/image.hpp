@@ -13,7 +13,7 @@ using uint8 = uint8_t;
 #define LCDW 80
 #define LimitL(L) (L = ((L < 1) ? 1 : L))
 #define LimitH(H) (H = ((H > 78) ? 78 : H))
-#define ImageSensorMid 39
+#define ImageSensorMid 41
 
 extern int ImageScanInterval;
 extern int ImageScanInterval_Cross;

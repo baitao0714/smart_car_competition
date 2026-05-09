@@ -85,13 +85,13 @@ int Speed_Lasterro_r = 0;
 int Speed_Preverro_r = 0;
 
 int PWM_Max = 4000;
-int PWM_Min = 0;  //-5000
+int PWM_Min = 100;  //-5000
 int16_t Speed_Begin = 80;
 int16_t Speed_Expect = 0;
 float Diff_Speed_error = 0;
 int16_t Diff_SpeedL_expect = 0;
 int16_t Diff_SpeedR_expect = 0;
-float Diff_Kp = 10.242f;   //10.242
+float Diff_Kp = 12.242f;   //10.242
 float Diff_Kd = 0.274f;
 uint8_t stop_flag = 0;
 
@@ -121,13 +121,13 @@ void Motor_Argument(void)
     Speed_Goal_l = 180;
     Speed_Goal_r = 180;
 
-    Speed_P_l = 7;
-    Speed_I_l = 0.3f; //1.65f;
-    Speed_D_l = 1;
+    Speed_P_l = 6;
+    Speed_I_l = 0; //1.65f;
+    Speed_D_l = 0;
 
-    Speed_P_r = 7;
-    Speed_I_r = 0.4f;
-    Speed_D_r = 1;
+    Speed_P_r = 6;
+    Speed_I_r = 0;
+    Speed_D_r = 0;
 }
 
 void Motor_Init1(int duty)

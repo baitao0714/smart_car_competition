@@ -21,9 +21,20 @@ namespace
             {
                 return false;
             }
-
             // 灰度图转三通道，便于彩色画线
-            cv::cvtColor(Gray_image, out_bgr, cv::COLOR_GRAY2BGR);
+            // cv::cvtColor(Gray_image, out_bgr, cv::COLOR_GRAY2BGR);
+            // 用二值化结果 Pixle 生成显示底图
+            cv::Mat bin_img(LCDH, LCDW, CV_8UC1);
+            for (int y = 0; y < LCDH; ++y)
+            {
+                for (int x = 0; x < LCDW; ++x)
+                {
+                    bin_img.at<uint8_t>(y, x) = Pixle[y][x] ? 255 : 0;
+                }
+            }
+
+            // 二值图转三通道，便于彩色画线
+            cv::cvtColor(bin_img, out_bgr, cv::COLOR_GRAY2BGR);
 
             const int rows = out_bgr.rows;
             const int cols = out_bgr.cols;
