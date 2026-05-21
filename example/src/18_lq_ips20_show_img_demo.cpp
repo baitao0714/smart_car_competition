@@ -27,7 +27,7 @@ void lq_ips20_show_img_demo(void)
     sleep(1);
     while (1)
     {
-        cam.get_frame(frame);
+        frame = cam.get_frame_raw();
         lq_ips20_drv_road_color(0, 0, frame);
     }
 

@@ -50,13 +50,13 @@ void lq_udp_img_trans_demo(void)
     printf("UDP client initialized\r\n");
 
     // 初始化摄像头
-    lq_camera cam(CAM_WIDTH, CAM_HEIGHT, CAM_FPS);
-    if (!cam.is_opened())
+    lq_camera_ex cam(CAM_WIDTH, CAM_HEIGHT, CAM_FPS);
+    if (!cam.is_cam_opened())
     {
         printf("ERROR: Failed to open camera!\r\n");
         return;
     }
-    printf("Camera opened: %dx%d @ %dfps\r\n", cam.get_width(), cam.get_height(), cam.get_fps());
+    printf("Camera opened: %dx%d @ %dfps\r\n", cam.get_camera_width(), cam.get_camera_height(), cam.get_camera_fps());
 
     // 发送帧计数
     uint32_t frame_count = 0;
@@ -70,7 +70,7 @@ void lq_udp_img_trans_demo(void)
     {
         // ===================== 获取并发送图像 =====================
         // 获取原始图像
-        cv::Mat frame = cam.get_raw_frame();
+        cv::Mat frame = cam.get_frame_raw();
         if (frame.empty())
         {
             printf("ERROR: Failed to read frame\r\n");

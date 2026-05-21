@@ -139,8 +139,8 @@ bool CarRuntime_RunCameraLoop(bool enable_motor,
     lq_log_error("OpenCV not enabled, car runtime is unavailable");
     return false;
 #else
-    lq_camera cam(width, height, fps);
-    if (!cam.is_opened())
+    lq_camera_ex cam(width, height, fps);
+    if (!cam.is_cam_opened())
     {
         lq_log_error("Failed to open camera for car runtime");
         return false;
@@ -168,7 +168,14 @@ bool CarRuntime_RunCameraLoop(bool enable_motor,
 
     while (ls_system_running.load())
     {
-        if (!CarRuntime_ProcessFrame(cam.get_raw_frame(), enable_motor))
+        cv::Mat frame = cam.get_frame_raw();
+        if (frame.empty())
+        {
+            usleep(empty_frame_delay_us);
+            continue;
+        }
+
+        if (!CarRuntime_ProcessFrame(frame, enable_motor))
         {
             usleep(empty_frame_delay_us);
             continue;

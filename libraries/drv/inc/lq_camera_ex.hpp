@@ -60,7 +60,7 @@ class lq_camera_ex
 public:
     // 有参构造函数构造函数
     explicit lq_camera_ex(uint16_t _width, uint16_t _height, uint16_t _fps, /* 摄像头宽高和帧率设置 */
-                          lq_camera_format_t _fmt = LQ_CAMERA_HIGH_MJPG,    /* 获取图像方式 */
+                          lq_camera_format_t _fmt = LQ_CAMERA_0CPU_MJPG,    /* 获取图像方式 */
                           const std::string _path = LQ_CAMERA_PATH);        /* 摄像头设备路径 */
     
     lq_camera_ex(const lq_camera_ex&) = delete;             // 禁用拷贝
@@ -83,7 +83,7 @@ public:
      * @note    如果已经初始化, 会先释放资源再重新初始化.
      ********************************************************************************/
     int init(uint16_t _width, uint16_t _height, uint16_t _fps, 
-             lq_camera_format_t _format = LQ_CAMERA_HIGH_MJPG, 
+             lq_camera_format_t _format = LQ_CAMERA_0CPU_MJPG, 
              const std::string _path = LQ_CAMERA_PATH);
 
     /********************************************************************************
@@ -101,12 +101,32 @@ public:
     int stop_collect();
 
     /********************************************************************************
-     * @brief   获取一帧图像.
-     * @param   frame  : 输出图像.
-     * @param   decode : 是否解码, 选择解码 frame 最终会返回数据, 不解码时 frame 不返回数据.
+     * @brief   获取原始图像帧.
+     * @return  返回一帧图像, 失败时返回空 Mat.
+     ********************************************************************************/
+    cv::Mat get_frame_raw();
+
+    /********************************************************************************
+     * @brief   获取灰度图像帧.
+     * @return  返回一帧灰度图像, 失败时返回空 Mat.
+     ********************************************************************************/
+    cv::Mat get_frame_gray();
+
+    /********************************************************************************
+     * @brief   同时获取原始图和灰度图.
      * @return  成功返回 true, 失败返回 false.
      ********************************************************************************/
-    bool get_frame(cv::Mat& frame, bool decode = true);
+    bool get_frame_raw_gray(cv::Mat &raw, cv::Mat &gray);
+
+    /********************************************************************************
+     * @brief   兼容旧代码的包装接口.
+     ********************************************************************************/
+    bool get_frame(cv::Mat& frame, bool decode = true)
+    {
+        (void)decode;
+        frame = get_frame_raw();
+        return !frame.empty();
+    }
 
 public:
     // 获取摄像头信息

@@ -115,6 +115,8 @@ else()
     list(REMOVE_ITEM EXAMPLE_SRC "${PROJECT_SOURCE_DIR}/../example/src/07_lq_ncnn_demo.cpp")
 endif()
 
+list(REMOVE_ITEM DRV_SRC "${PROJECT_SOURCE_DIR}/../libraries/drv/src/lq_camera.cpp")
+
 set(SRC
     ${MAIN_SRC}
     ${APP_SRC}
