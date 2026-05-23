@@ -19,53 +19,58 @@
 #endif
 
 #ifndef LQ_DEMO_TARGET
-#define LQ_DEMO_TARGET LQ_DEMO_NONE // eg: LQ_DEMO_PWM / LQ_DEMO_MOTOR / LQ_DEMO_NONE
+#define LQ_DEMO_TARGET \
+	LQ_DEMO_NONE // eg: LQ_DEMO_PWM / LQ_DEMO_MOTOR / LQ_DEMO_NONE
 #endif
 
-int main()
-{
+int main() {
 #if LQ_APP_TARGET == LQ_APP_CAR_RUNTIME
-    #if defined(CAR_RUNTIME_HAS_UDP)
-        (void)CarRuntime_RunCameraLoop(true, 320, 240, 90, 1000, 20 * 1000, 20 * 1000,
-                                true, "192.168.193.117", 8080, 30, 33);
-    #else
-        (void)CarRuntime_RunCameraLoop(true, 320, 240, 90, 1000, 20 * 1000, 20 * 1000);
-    #endif
-#elif LQ_DEMO_TARGET == LQ_DEMO_GPIO_OUTPUT
-    lq_log_info("Run demo: GPIO output");
-    lq_gpio_output_demo();
-#elif LQ_DEMO_TARGET == LQ_DEMO_GPIO_INPUT
-    lq_log_info("Run demo: GPIO input");
-    lq_gpio_input_demo();
-#elif LQ_DEMO_TARGET == LQ_DEMO_PWM
-    lq_log_info("Run demo: PWM");
-    lq_pwm_demo();
-#elif LQ_DEMO_TARGET == LQ_DEMO_GTIM_PWM
-    lq_log_info("Run demo: GTIM PWM");
-    lq_gtim_pwm_demo();
-#elif LQ_DEMO_TARGET == LQ_DEMO_ENCODER_PWM
-    lq_log_info("Run demo: encoder PWM");
-    lq_encoder_pwm_demo();
-#elif LQ_DEMO_TARGET == LQ_DEMO_MOTOR
-    lq_log_info("Run demo: motor");
-    lq_motor_demo();
-#elif LQ_DEMO_TARGET == LQ_DEMO_IMAGE
-    lq_log_info("Run demo: image");
-    lq_image_demo();
-#elif LQ_DEMO_TARGET == LQ_DEMO_IMAGE_MOTOR
-    lq_log_info("Run demo: image+motor");
-    lq_image_motor_demo();
-#elif LQ_DEMO_TARGET == LQ_DEMO_MOTOR_ENCODER
-    lq_log_info("Run demo: motor+encoder");
-    lq_motor_encoder_demo();
+#if defined(CAR_RUNTIME_HAS_UDP)
+	(void)CarRuntime_RunCameraLoop(
+	    true, 320, 240, 90, 1000, 20 * 1000,
+	    // 白涛ip
+	    //  20 * 1000, true, "192.168.193.117", 8080, 30, 33);
+	    // 林哥ip
+	    20 * 1000, true, "192.168.193.172", 8080, 30, 33);
 #else
-    lq_log_info("No app or demo selected. Set LQ_APP_TARGET for the formal runtime, or LQ_DEMO_TARGET for testing.");
+	(void)CarRuntime_RunCameraLoop(true, 320, 240, 90, 1000, 20 * 1000,
+	                               20 * 1000);
+#endif
+#elif LQ_DEMO_TARGET == LQ_DEMO_GPIO_OUTPUT
+	lq_log_info("Run demo: GPIO output");
+	lq_gpio_output_demo();
+#elif LQ_DEMO_TARGET == LQ_DEMO_GPIO_INPUT
+	lq_log_info("Run demo: GPIO input");
+	lq_gpio_input_demo();
+#elif LQ_DEMO_TARGET == LQ_DEMO_PWM
+	lq_log_info("Run demo: PWM");
+	lq_pwm_demo();
+#elif LQ_DEMO_TARGET == LQ_DEMO_GTIM_PWM
+	lq_log_info("Run demo: GTIM PWM");
+	lq_gtim_pwm_demo();
+#elif LQ_DEMO_TARGET == LQ_DEMO_ENCODER_PWM
+	lq_log_info("Run demo: encoder PWM");
+	lq_encoder_pwm_demo();
+#elif LQ_DEMO_TARGET == LQ_DEMO_MOTOR
+	lq_log_info("Run demo: motor");
+	lq_motor_demo();
+#elif LQ_DEMO_TARGET == LQ_DEMO_IMAGE
+	lq_log_info("Run demo: image");
+	lq_image_demo();
+#elif LQ_DEMO_TARGET == LQ_DEMO_IMAGE_MOTOR
+	lq_log_info("Run demo: image+motor");
+	lq_image_motor_demo();
+#elif LQ_DEMO_TARGET == LQ_DEMO_MOTOR_ENCODER
+	lq_log_info("Run demo: motor+encoder");
+	lq_motor_encoder_demo();
+#else
+	lq_log_info("No app or demo selected. Set LQ_APP_TARGET for the formal "
+	            "runtime, or LQ_DEMO_TARGET for testing.");
 
-    while (1)
-    {
-        usleep(100 * 1000);
-    }
+	while (1) {
+		usleep(100 * 1000);
+	}
 #endif
 
-    return 0;
+	return 0;
 }
