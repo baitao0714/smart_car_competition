@@ -75,6 +75,35 @@ float my_abs(float x) {
 	return x;
 }
 
+const char* RoadTypeToString(RoadType_e type) {
+	switch (type) {
+	case Normol:
+		return "Normol";
+	case Straight:
+		return "Straight";
+	case Cross:
+		return "Cross";
+	case Ramp:
+		return "Ramp";
+	case LeftCirque:
+		return "LeftCirque";
+	case RightCirque:
+		return "RightCirque";
+	case Forkin:
+		return "Forkin";
+	case Forkout:
+		return "Forkout";
+	case Barn_out:
+		return "Barn_out";
+	case Barn_in:
+		return "Barn_in";
+	case Cross_ture:
+		return "Cross_ture";
+	default:
+		return "Unknown";
+	}
+}
+
 static void Image_Process() {
 #ifdef LQ_HAVE_OPENCV
 	if (First_image.empty()) {
@@ -2122,13 +2151,13 @@ void ImageProcess(void) {
 	if (++image_debug_log_divider >= 30) {
 		image_debug_log_divider = 0;
 		std::printf(
-		    "Left_Line=%u Right_Line=%u WhiteLine=%u OFFLine=%u\n Road_type=%u "
-		    "Rings_flag=%u Ring_Help_Flag=%u\n",
+		    "Left_Line=%u Right_Line=%u WhiteLine=%u OFFLine=%u\n"
+		    "Road_type=%s Rings_flag=%u Ring_Help_Flag=%u\n",
 		    static_cast<unsigned int>(ImageStatus.Left_Line),
 		    static_cast<unsigned int>(ImageStatus.Right_Line),
 		    static_cast<unsigned int>(ImageStatus.WhiteLine),
 		    static_cast<unsigned int>(ImageStatus.OFFLine),
-		    static_cast<unsigned int>(ImageStatus.Road_type),
+		    RoadTypeToString(ImageStatus.Road_type),
 		    static_cast<unsigned int>(ImageFlag.image_element_rings_flag),
 		    static_cast<unsigned int>(Ring_Help_Flag));
 	}
