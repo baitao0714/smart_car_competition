@@ -121,7 +121,7 @@ void Data_Settings(void) {
 	ImageStatus.CirqueOff = 'F';                   // 环岛偏离状态标志
 	ImageStatus.Barn_Flag = 0;                     // 车库状态标志
 	ImageStatus.straight_acc = 0;                  // 直道累计计数/状态
-	ImageStatus.TowPoint = 25;                     // 前瞻行位置21
+	ImageStatus.TowPoint = 30;                     // 前瞻行位置21
 	ImageStatus.Threshold_static = 70;             // 固定二值化阈值
 	ImageStatus.Threshold_detach = 180;            // 阈值分离上界
 	ImageStatus.variance_acc = 25;                 // 方差累计阈值
@@ -1475,7 +1475,7 @@ void Element_Handle_Left_Rings() {
 	    ImageFlag.image_element_rings_flag == 4) {
 		for (int Ysite = 57; Ysite > ImageStatus.OFFLine; Ysite--) {
 			ImageDeal[Ysite].Center =
-			    ImageDeal[Ysite].RightBorder - Half_Road_Wide[Ysite] - 5;
+			    ImageDeal[Ysite].RightBorder - Half_Road_Wide[Ysite] + 8;
 		}
 	}
 	// 进环 切外
@@ -1524,12 +1524,15 @@ void Element_Handle_Left_Rings() {
 				// if(ImageFlag.ring_big_small==1)// 大环岛补中线
 				ImageDeal[Ysite].Center = ((ImageDeal[Ysite].RightBorder +
 				                            ImageDeal[Ysite].LeftBorder) /
-				                           2);
+				                           2) +
+				                          8;
 				// else// 小环岛补中线
 				//     ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder -
 				//     Half_Bend_Wide[Ysite];
 				if (ImageDeal[Ysite].Center < 4)
 					ImageDeal[Ysite].Center = 4;
+				if (ImageDeal[Ysite].Center > 78)
+					ImageDeal[Ysite].Center = 78;
 			}
 			ImageDeal[flag_Ysite_1].RightBorder = flag_Xsite_1;
 			for (Ysite = flag_Ysite_1 - 1; Ysite > 10;
@@ -1544,13 +1547,16 @@ void Element_Handle_Left_Rings() {
 						ImageDeal[Ysite].Center =
 						    ((ImageDeal[Ysite].RightBorder +
 						      ImageDeal[Ysite].LeftBorder) /
-						     2);
+						     2) +
+						    6;
 						// else// 小环岛补中线
 						//     ImageDeal[Ysite].Center =
 						//     ImageDeal[Ysite].RightBorder -
 						//     Half_Bend_Wide[Ysite];
 						if (ImageDeal[Ysite].Center < 4)
 							ImageDeal[Ysite].Center = 4;
+						if (ImageDeal[Ysite].Center > 78)
+							ImageDeal[Ysite].Center = 78;
 						ImageDeal[Ysite].Wide = ImageDeal[Ysite].RightBorder -
 						                        ImageDeal[Ysite].LeftBorder;
 						break;
@@ -1745,7 +1751,9 @@ void Element_Handle_Right_Rings() {
 	    ImageFlag.image_element_rings_flag == 4) {
 		for (int Ysite = 59; Ysite > ImageStatus.OFFLine; Ysite--) {
 			ImageDeal[Ysite].Center =
-			    ImageDeal[Ysite].LeftBorder + Half_Road_Wide[Ysite];
+			    ImageDeal[Ysite].LeftBorder + Half_Road_Wide[Ysite] - 8;
+			if (ImageDeal[Ysite].Center < 1)
+				ImageDeal[Ysite].Center = 1;
 		}
 	}
 
@@ -1795,11 +1803,14 @@ void Element_Handle_Right_Rings() {
 				//                    ImageDeal[Ysite].Center=ImageDeal[Ysite].LeftBorder+Half_Bend_Wide[Ysite];//
 				//                    中线
 				//                else// 大环岛补中线
-				ImageDeal[Ysite].Center = (ImageDeal[Ysite].LeftBorder +
-				                           ImageDeal[Ysite].RightBorder) /
-				                          2; // 中线
+				ImageDeal[Ysite].Center = ((ImageDeal[Ysite].LeftBorder +
+				                            ImageDeal[Ysite].RightBorder) /
+				                           2) -
+				                          6; // 中线
 				if (ImageDeal[Ysite].Center > 79)
 					ImageDeal[Ysite].Center = 79;
+				if (ImageDeal[Ysite].Center < 1)
+					ImageDeal[Ysite].Center = 1;
 			}
 			ImageDeal[flag_Ysite_1].LeftBorder = flag_Xsite_1;
 			for (Ysite = flag_Ysite_1 - 1; Ysite > 10;
@@ -1818,9 +1829,10 @@ void Element_Handle_Right_Rings() {
 						//                         中线
 						//                     else// 大环岛补中线
 						ImageDeal[Ysite].Center =
-						    (ImageDeal[Ysite].LeftBorder +
-						     ImageDeal[Ysite].RightBorder) /
-						    2; // 中线
+						    ((ImageDeal[Ysite].LeftBorder +
+						      ImageDeal[Ysite].RightBorder) /
+						     2) -
+						    6; // 中线
 						if (ImageDeal[Ysite].Center > 79)
 							ImageDeal[Ysite].Center = 79;
 						if (ImageDeal[Ysite].Center < 5)
@@ -1994,7 +2006,7 @@ void GetDet() {
 		TowPoint = 22;
 	} else if (ImageFlag.image_element_rings_flag == 1 ||
 	           ImageFlag.image_element_rings_flag == 2) {
-		TowPoint = 30;
+		TowPoint = 26;
 	} else
 		TowPoint = ImageStatus.TowPoint - SpeedGain; // 速度越快前瞻越大
 

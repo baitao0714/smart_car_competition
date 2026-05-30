@@ -81,8 +81,8 @@ int16_t Speed_Expect = 0;
 float Diff_Speed_error = 0;
 int16_t Diff_SpeedL_expect = 0;
 int16_t Diff_SpeedR_expect = 0;
-float Diff_Kp = 10.242f; // 10.242
-float Diff_Kd = 20.274f;
+float Diff_Kp = 7.0f; // 10.242f
+float Diff_Kd = 10.0f;
 uint8_t stop_flag = 0;
 
 float Encoder_Left1(void) {
@@ -286,17 +286,17 @@ void Motor_Diff_Pid1(void) {
 	    current_Kp * turn_error + Diff_Kd * (turn_error - last_turn_error);
 	last_turn_error = turn_error;
 
-	if (turn_output > 500.0f) {
-		turn_output = 500.0f;
+	if (turn_output > 350.0f) {
+		turn_output = 350.0f;
 	}
-	if (turn_output < -500.0f) {
-		turn_output = -500.0f;
+	if (turn_output < -350.0f) {
+		turn_output = -350.0f;
 	}
 
 	int current_base_speed =
-	    Speed_Goal_l - static_cast<int>(my_abs(turn_error) * 3.5f);
-	if (current_base_speed < 120) {
-		current_base_speed = 120;
+	    Speed_Goal_l - static_cast<int>(my_abs(turn_error) * 5.0f);
+	if (current_base_speed < 100) {
+		current_base_speed = 100;
 	}
 
 	Diff_SpeedL_expect = static_cast<int16_t>(current_base_speed +
@@ -310,10 +310,10 @@ void Motor_Diff_Pid1(void) {
 	if (Diff_SpeedR_expect < 0) {
 		Diff_SpeedR_expect = 0;
 	}
-	if (Diff_SpeedL_expect > 1500) {
-		Diff_SpeedL_expect = 1500;
+	if (Diff_SpeedL_expect > 1000) {
+		Diff_SpeedL_expect = 1000;
 	}
-	if (Diff_SpeedR_expect > 1500) {
-		Diff_SpeedR_expect = 1500;
+	if (Diff_SpeedR_expect > 1000) {
+		Diff_SpeedR_expect = 1000;
 	}
 }
