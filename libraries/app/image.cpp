@@ -2100,20 +2100,25 @@ void ImageProcess(void) {
 	Element_Test(); // 5us
 	/***元素识别*****/
 	DrawExtensionLine();
-	RouteFilter(); // 路径滤波平滑 2us
-	/***元素处理*****/
-	//  Element_Handle();  // 3us
+	RouteFilter();    // 路径滤波平滑 2us
+	                  /***元素处理*****/
+	Element_Handle(); // 3us
 	/***元素处理*****/
 	// Stop_Test();           // 过桥保护   出环后  确保已经过环
 	GetDet(); // 获取动态前瞻 并计算图像偏差 3us
 
 	if (++image_debug_log_divider >= 30) {
 		image_debug_log_divider = 0;
-		std::printf("Left_Line=%u Right_Line=%u WhiteLine=%u OFFLine=%u\n",
-		            static_cast<unsigned int>(ImageStatus.Left_Line),
-		            static_cast<unsigned int>(ImageStatus.Right_Line),
-		            static_cast<unsigned int>(ImageStatus.WhiteLine),
-		            static_cast<unsigned int>(ImageStatus.OFFLine));
+		std::printf(
+		    "Left_Line=%u Right_Line=%u WhiteLine=%u OFFLine=%u\n Road_type=%u "
+		    "Rings_flag=%u Ring_Help_Flag=%u\n",
+		    static_cast<unsigned int>(ImageStatus.Left_Line),
+		    static_cast<unsigned int>(ImageStatus.Right_Line),
+		    static_cast<unsigned int>(ImageStatus.WhiteLine),
+		    static_cast<unsigned int>(ImageStatus.OFFLine),
+		    static_cast<unsigned int>(ImageStatus.Road_type),
+		    static_cast<unsigned int>(ImageFlag.image_element_rings_flag),
+		    static_cast<unsigned int>(Ring_Help_Flag));
 	}
 
 	// if (++draw_line_divider >= 30)
