@@ -12,6 +12,7 @@ void lq_gtim_pwm_demo(void);       // GTIM PWM 输出模式测试
 void lq_atim_pwm_demo(void);       // ATIM PWM 输出模式测试
 void lq_encoder_pwm_demo(void);    // 编码器 PWM 输出模式测试
 void lq_motor_demo(void);          // 电机正反转测试
+void lq_brushless_demo(void);      // 无刷电机测试
 void lq_motor_encoder_demo(void);  // 两个电机 + 两个编码器联测
 void lq_image_demo(void);          // 图像闭环基础测试
 void lq_image_motor_demo(void);    // 图像+电机闭环联调测试

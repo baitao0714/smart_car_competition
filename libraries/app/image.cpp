@@ -1,9 +1,15 @@
 #include "image.hpp"
 #include "lq_common.hpp"
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <string>
+#include <fstream>
+#include <sstream>
+#include <sys/stat.h>
+#include <ctime>
 
 #ifdef LQ_HAVE_OPENCV
 #include <opencv2/imgproc.hpp>
@@ -15,6 +21,7 @@ cv::Mat Cut_image;
 cv::Mat Resized_image;
 cv::Mat Gray_image;
 cv::Mat Bin_Frame;
+cv::Mat Element_image;
 #endif
 
 int ImageScanInterval;       // 扫描范围   当前行的边界+-ImageScanInterval
@@ -38,6 +45,7 @@ ImageStatustypedef ImageStatus;               // 图像状态（结构体）
 ImageStatustypedef ImageData;                 // 图像数据（结构体）
 SystemDatatypdef SystemData;                  // 系统数据（结构体）
 ImageFlagtypedef ImageFlag;                   // 图像标志（结构体）
+ElementDetectDatatypedef ElementDetect;       // 元素识别状态（结构体）
 float Weighting[10] = {0.96, 0.92, 0.88, 0.83, 0.77, 0.71,
                        0.65, 0.59, 0.53, 0.47}; // 10个权重系数，按正态分布设置
 uint8_t ExtenLFlag = 0;                         // 是否左延长标志
@@ -75,6 +83,354 @@ float my_abs(float x) {
 	return x;
 }
 
+#ifdef LQ_HAVE_OPENCV
+namespace {
+static time_t g_element_cfg_mtime = 0;
+static const char* kElementConfigPath = "element_roi.conf";
+
+static std::string Trim(const std::string& s) {
+	const char* ws = " \t\r\n";
+	auto start = s.find_first_not_of(ws);
+	if (start == std::string::npos) return std::string();
+	auto end = s.find_last_not_of(ws);
+	return s.substr(start, end - start + 1);
+}
+
+void LoadElementConfigImpl(const char* path) {
+	std::ifstream ifs(path);
+	if (!ifs.is_open()) {
+		// create default config file
+		std::ofstream ofs(path);
+		if (!ofs.is_open()) return;
+		ofs << "# element ROI config\n";
+		ofs << "red_min_area=200\n";
+		ofs << "white_trigger_percent=90\n";
+		ofs << "stable_frames_need=2\n";
+		ofs << "roi_width_scale_percent=220\n";
+		ofs << "roi_height_scale_percent=180\n";
+		ofs << "roi_gap_pixels=4\n";
+		ofs << "roi_x_offset_pixels=0\n";
+		ofs << "roi_y_offset_pixels=0\n";
+		ofs << "enable=1\n";
+		ofs.close();
+		return;
+	}
+
+	std::string line;
+	while (std::getline(ifs, line)) {
+		line = Trim(line);
+		if (line.empty() || line[0] == '#') continue;
+		auto pos = line.find('=');
+		if (pos == std::string::npos) continue;
+		auto key = Trim(line.substr(0, pos));
+		auto val = Trim(line.substr(pos + 1));
+		int iv = 0;
+		try { iv = std::stoi(val); } catch(...) { continue; }
+		if (key == "red_min_area") ElementDetect.red_min_area = static_cast<int16_t>(iv);
+		else if (key == "white_trigger_percent") ElementDetect.white_trigger_percent = static_cast<int16_t>(iv);
+		else if (key == "stable_frames_need") ElementDetect.stable_frames_need = static_cast<int16_t>(iv);
+		else if (key == "roi_width_scale_percent") ElementDetect.roi_width_scale_percent = static_cast<int16_t>(iv);
+		else if (key == "roi_height_scale_percent") ElementDetect.roi_height_scale_percent = static_cast<int16_t>(iv);
+		else if (key == "roi_gap_pixels") ElementDetect.roi_gap_pixels = static_cast<int16_t>(iv);
+		else if (key == "roi_x_offset_pixels") ElementDetect.roi_x_offset_pixels = static_cast<int16_t>(iv);
+		else if (key == "roi_y_offset_pixels") ElementDetect.roi_y_offset_pixels = static_cast<int16_t>(iv);
+		else if (key == "enable") ElementDetect.enable = static_cast<int16_t>(iv);
+	}
+	ifs.close();
+	struct stat st;
+	if (stat(path, &st) == 0) g_element_cfg_mtime = st.st_mtime;
+	std::printf("Loaded element config from %s: enable=%d red_min_area=%d white_trigger=%d stable_frames=%d roi_w%%=%d roi_h%%=%d gap=%d\n",
+		path, ElementDetect.enable, ElementDetect.red_min_area, ElementDetect.white_trigger_percent,
+		ElementDetect.stable_frames_need, ElementDetect.roi_width_scale_percent,
+		ElementDetect.roi_height_scale_percent, ElementDetect.roi_gap_pixels);
+}
+
+void ElementConfigReloadIfNeededImpl(const char* path) {
+	struct stat st;
+	if (stat(path, &st) != 0) {
+		// if config doesn't exist, attempt to create defaults
+		LoadElementConfig(path);
+		return;
+	}
+	if (st.st_mtime != g_element_cfg_mtime) {
+		LoadElementConfig(path);
+	}
+}
+} // namespace
+
+// Public wrappers with external linkage
+void LoadElementConfig(const char* path) {
+	LoadElementConfigImpl(path);
+}
+
+void ElementConfigReloadIfNeeded(const char* path) {
+	ElementConfigReloadIfNeededImpl(path);
+}
+#endif
+
+static cv::Rect ClampRect(const cv::Rect& rect, const cv::Size& size) {
+	int x = std::max(0, rect.x);
+	int y = std::max(0, rect.y);
+	int w = std::min(rect.width, size.width - x);
+	int h = std::min(rect.height, size.height - y);
+	if (w <= 0 || h <= 0) {
+		return cv::Rect();
+	}
+	return cv::Rect(x, y, w, h);
+}
+
+static bool DetectRedMarker(const cv::Mat& frame, cv::Rect& marker_rect,
+							float& red_fill_ratio) {
+	if (frame.empty()) {
+		return false;
+	}
+
+	cv::Mat hsv;
+	cv::cvtColor(frame, hsv, cv::COLOR_BGR2HSV);
+
+	cv::Mat mask1;
+	cv::Mat mask2;
+	cv::Mat red_mask;
+	cv::inRange(hsv, cv::Scalar(0, 80, 60), cv::Scalar(10, 255, 255), mask1);
+	cv::inRange(hsv, cv::Scalar(156, 80, 60), cv::Scalar(180, 255, 255), mask2);
+	cv::bitwise_or(mask1, mask2, red_mask);
+	cv::morphologyEx(red_mask, red_mask, cv::MORPH_CLOSE,
+					 cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
+	cv::morphologyEx(red_mask, red_mask, cv::MORPH_OPEN,
+					 cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
+
+	std::vector<std::vector<cv::Point>> contours;
+	cv::findContours(red_mask, contours, cv::RETR_EXTERNAL,
+					 cv::CHAIN_APPROX_SIMPLE);
+
+	double best_area = 0.0;
+	marker_rect = cv::Rect();
+	for (const auto& contour : contours) {
+		const double area = cv::contourArea(contour);
+		if (area < ElementDetect.red_min_area) {
+			continue;
+		}
+
+		const cv::Rect rect = cv::boundingRect(contour);
+		if (rect.width <= 0 || rect.height <= 0) {
+			continue;
+		}
+
+		const float aspect = static_cast<float>(rect.width) /
+							 static_cast<float>(rect.height);
+		if (aspect < 0.2f || aspect > 10.0f) {
+			continue;
+		}
+
+		if (area > best_area) {
+			best_area = area;
+			marker_rect = rect;
+		}
+	}
+
+	if (marker_rect.width <= 0 || marker_rect.height <= 0) {
+		return false;
+	}
+
+	red_fill_ratio = static_cast<float>(best_area) /
+					 static_cast<float>(marker_rect.area());
+	return true;
+}
+
+static cv::Rect BuildClassifyRoi(const cv::Rect& marker_rect,
+								 const cv::Size& frame_size) {
+	if (marker_rect.width <= 0 || marker_rect.height <= 0) {
+		return cv::Rect();
+	}
+
+	const int roi_width = std::max(1, marker_rect.width * ElementDetect.roi_width_scale_percent / 100);
+	const int roi_height = std::max(1, marker_rect.height * ElementDetect.roi_height_scale_percent / 100);
+	const int center_x = marker_rect.x + marker_rect.width / 2;
+	const int roi_x = center_x - roi_width / 2 + ElementDetect.roi_x_offset_pixels;
+	const int roi_y = marker_rect.y - roi_height - ElementDetect.roi_gap_pixels +
+						 ElementDetect.roi_y_offset_pixels;
+
+	return ClampRect(cv::Rect(roi_x, roi_y, roi_width, roi_height), frame_size);
+}
+
+static int ClassifyElementPatch(const cv::Mat& patch) {
+	if (patch.empty()) {
+		return 0;
+	}
+
+	cv::Mat gray;
+	if (patch.channels() == 3) {
+		cv::cvtColor(patch, gray, cv::COLOR_BGR2GRAY);
+	} else {
+		gray = patch;
+	}
+
+	cv::Mat bin_img;
+	cv::threshold(gray, bin_img, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+
+	const double total_pixels = static_cast<double>(bin_img.total());
+	if (total_pixels <= 0.0) {
+		return 0;
+	}
+
+	const double white_pixels = static_cast<double>(cv::countNonZero(bin_img));
+	const float white_ratio = static_cast<float>(white_pixels / total_pixels);
+
+	std::vector<std::vector<cv::Point>> contours;
+	cv::findContours(bin_img, contours, cv::RETR_EXTERNAL,
+					 cv::CHAIN_APPROX_SIMPLE);
+
+	cv::Rect largest_rect;
+	double largest_area = 0.0;
+	for (const auto& contour : contours) {
+		const double area = cv::contourArea(contour);
+		if (area > largest_area) {
+			largest_area = area;
+			largest_rect = cv::boundingRect(contour);
+		}
+	}
+
+	float aspect_ratio = 1.0f;
+	if (largest_rect.width > 0 && largest_rect.height > 0) {
+		aspect_ratio = static_cast<float>(largest_rect.width) /
+					   static_cast<float>(largest_rect.height);
+	}
+
+	cv::Mat edges;
+	cv::Canny(gray, edges, 60, 160);
+	const float edge_density = static_cast<float>(cv::countNonZero(edges)) /
+						   static_cast<float>(total_pixels);
+
+	if (white_ratio > 0.82f && edge_density < 0.05f) {
+		return 0; // 物资
+	}
+	if (aspect_ratio > 1.20f && edge_density > 0.06f) {
+		return 1; // 交通工具
+	}
+	if (aspect_ratio < 0.90f || edge_density > 0.10f) {
+		return 2; // 武器
+	}
+	return 0;
+}
+
+static const char* ElementClassName(int class_id) {
+	switch (class_id) {
+	case 0:
+		return "supplies";
+	case 1:
+		return "vehicle";
+	case 2:
+		return "weapon";
+	default:
+		return "none";
+	}
+}
+
+static int ClassToRouteMode(int class_id) {
+	switch (class_id) {
+	case 0:
+		return 2;
+	case 1:
+		return 3;
+	case 2:
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+static void UpdateElementDetectState(const cv::Mat& frame) {
+	if (!ElementDetect.enable) {
+		return;
+	}
+
+	ElementDetect.red_found = 0;
+	ElementDetect.white_ratio = 0;
+	ElementDetect.class_id = 0;
+	ElementDetect.route_mode = 0;
+	ElementDetect.red_x = 0;
+	ElementDetect.red_y = 0;
+	ElementDetect.red_w = 0;
+	ElementDetect.red_h = 0;
+	ElementDetect.roi_x = 0;
+	ElementDetect.roi_y = 0;
+	ElementDetect.roi_w = 0;
+	ElementDetect.roi_h = 0;
+
+	cv::Rect marker_rect;
+	float red_fill_ratio = 0.0f;
+	if (!DetectRedMarker(frame, marker_rect, red_fill_ratio)) {
+		ElementDetect.stable_frames = 0;
+		return;
+	}
+
+	ElementDetect.red_found = 1;
+	ElementDetect.red_x = static_cast<int16_t>(marker_rect.x);
+	ElementDetect.red_y = static_cast<int16_t>(marker_rect.y);
+	ElementDetect.red_w = static_cast<int16_t>(marker_rect.width);
+	ElementDetect.red_h = static_cast<int16_t>(marker_rect.height);
+	if (marker_rect.area() < ElementDetect.red_min_area) {
+		ElementDetect.stable_frames = 0;
+		return;
+	}
+
+	const cv::Mat marker_patch = frame(marker_rect).clone();
+	cv::Mat marker_gray;
+	if (marker_patch.channels() == 3) {
+		cv::cvtColor(marker_patch, marker_gray, cv::COLOR_BGR2GRAY);
+	} else {
+		marker_gray = marker_patch;
+	}
+
+	cv::Mat bin_img;
+	cv::threshold(marker_gray, bin_img, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+	const double white_pixels = static_cast<double>(cv::countNonZero(bin_img));
+	const double total_pixels = static_cast<double>(bin_img.total());
+	if (total_pixels <= 0.0) {
+		return;
+	}
+
+	const int white_ratio_percent = static_cast<int>(std::lround(
+		100.0 * white_pixels / total_pixels));
+	ElementDetect.white_ratio = static_cast<int16_t>(white_ratio_percent);
+
+	if (white_ratio_percent >= ElementDetect.white_trigger_percent) {
+		if (ElementDetect.stable_frames < 32767) {
+			ElementDetect.stable_frames++;
+		}
+	} else {
+		ElementDetect.stable_frames = 0;
+	}
+
+	if (ElementDetect.stable_frames < ElementDetect.stable_frames_need) {
+		return;
+	}
+
+	const cv::Rect classify_roi = BuildClassifyRoi(marker_rect, frame.size());
+	if (classify_roi.width <= 0 || classify_roi.height <= 0) {
+		return;
+	}
+
+	ElementDetect.roi_x = static_cast<int16_t>(classify_roi.x);
+	ElementDetect.roi_y = static_cast<int16_t>(classify_roi.y);
+	ElementDetect.roi_w = static_cast<int16_t>(classify_roi.width);
+	ElementDetect.roi_h = static_cast<int16_t>(classify_roi.height);
+
+	Element_image = frame(classify_roi).clone();
+
+	const int class_id = ClassifyElementPatch(Element_image);
+	ElementDetect.class_id = static_cast<int16_t>(class_id);
+	ElementDetect.route_mode = static_cast<int16_t>(ClassToRouteMode(class_id));
+	SystemData.Model = class_id;
+	std::printf("ElementDetect: marker=(%d,%d,%d,%d) roi=(%d,%d,%d,%d) white=%d%% class=%s\n",
+			ElementDetect.red_x, ElementDetect.red_y, ElementDetect.red_w,
+			ElementDetect.red_h, ElementDetect.roi_x, ElementDetect.roi_y,
+			ElementDetect.roi_w, ElementDetect.roi_h, ElementDetect.white_ratio,
+			ElementClassName(class_id));
+}
+} // namespace
+#endif
+
 const char* RoadTypeToString(RoadType_e type) {
 	switch (type) {
 	case Normol:
@@ -111,6 +467,7 @@ static void Image_Process() {
 		Cut_image.release();
 		Resized_image.release();
 		Bin_Frame.release();
+		Element_image.release();
 		return;
 	}
 
@@ -121,10 +478,13 @@ static void Image_Process() {
 		Cut_image.release();
 		Resized_image.release();
 		Bin_Frame.release();
+		Element_image.release();
 		return;
 	}
 
 	cv::rotate(First_image, First_image, cv::ROTATE_180);
+	ElementConfigReloadIfNeeded(kElementConfigPath);
+	UpdateElementDetectState(First_image);
 
 	int x = (First_image.cols - cut_width) / 2;
 	int y = (First_image.rows - cut_height) / 2;
@@ -165,9 +525,33 @@ void Data_Settings(void) {
 	ImageScanInterval = 2;       // 常规行边界扫描半径
 	ImageScanInterval_Cross = 2; // 十字/特殊路段扫描半径
 
+	ElementDetect.enable = 1;
+	ElementDetect.red_found = 0;
+	ElementDetect.stable_frames = 0;
+	ElementDetect.white_ratio = 0;
+	ElementDetect.class_id = 0;
+	ElementDetect.route_mode = 0;
+	ElementDetect.red_min_area = 200;
+	ElementDetect.white_trigger_percent = 90;
+	ElementDetect.stable_frames_need = 2;
+	ElementDetect.roi_width_scale_percent = 220;
+	ElementDetect.roi_height_scale_percent = 180;
+	ElementDetect.roi_gap_pixels = 4;
+	ElementDetect.roi_x_offset_pixels = 0;
+	ElementDetect.roi_y_offset_pixels = 0;
+	ElementDetect.red_x = 0;
+	ElementDetect.red_y = 0;
+	ElementDetect.red_w = 0;
+	ElementDetect.red_h = 0;
+	ElementDetect.roi_x = 0;
+	ElementDetect.roi_y = 0;
+	ElementDetect.roi_w = 0;
+	ElementDetect.roi_h = 0;
+
 	SystemData.clrcle_num = 0;          // 环岛计数清零
 	SystemData.Stop = 1;                // 初始停止标志
 	SystemData.straighet_towpoint = 30; // 直道前瞻参考值
+	SystemData.Model = 0;
 
 	border_point = 0; // 边界特征点计数清零
 	top_point = 0;    // 顶点特征点计数清零
@@ -180,6 +564,7 @@ void cleanup(void) {
 	Resized_image.release();
 	Gray_image.release();
 	Bin_Frame.release();
+	Element_image.release();
 #endif
 }
 
@@ -1261,6 +1646,11 @@ void Element_Judgment_Left_Rings() {
 		ImageFlag.ring_big_small = 1;
 
 		ImageStatus.Road_type = LeftCirque;
+		std::printf("LeftRing detect: P1=%d P2=%d rings=%d flag=%d\n",
+		            Left_RingsFlag_Point1_Ysite,
+		            Left_RingsFlag_Point2_Ysite,
+		            static_cast<int>(ImageFlag.image_element_rings),
+		            static_cast<int>(ImageFlag.image_element_rings_flag));
 		// gpio_set_level(P20_8, 0);
 		// wireless_uart_send_byte(9);
 	}
@@ -1345,6 +1735,11 @@ void Element_Judgment_Right_Rings() {
 		ImageFlag.ring_big_small = 1; // 小环
 		SystemData.Stop = 1;
 		ImageStatus.Road_type = RightCirque;
+		std::printf("RightRing detect: P1=%d P2=%d rings=%d flag=%d\n",
+		            Right_RingsFlag_Point1_Ysite,
+		            Right_RingsFlag_Point2_Ysite,
+		            static_cast<int>(ImageFlag.image_element_rings),
+		            static_cast<int>(ImageFlag.image_element_rings_flag));
 		//        flag_ceshi++;
 		//        gpio_set_level(Bee1p, 1);
 	}
@@ -2147,6 +2542,15 @@ void ImageProcess(void) {
 	/***元素处理*****/
 	// Stop_Test();           // 过桥保护   出环后  确保已经过环
 	GetDet(); // 获取动态前瞻 并计算图像偏差 3us
+
+	// 刷屏式打印环岛调试信息（每帧打印）
+	std::printf("RingInfo: LeftP1=%d LeftP2=%d RightP1=%d RightP2=%d rings=%d flag=%d\n",
+	            Left_RingsFlag_Point1_Ysite,
+	            Left_RingsFlag_Point2_Ysite,
+	            Right_RingsFlag_Point1_Ysite,
+	            Right_RingsFlag_Point2_Ysite,
+	            static_cast<int>(ImageFlag.image_element_rings),
+	            static_cast<int>(ImageFlag.image_element_rings_flag));
 
 	if (++image_debug_log_divider >= 30) {
 		image_debug_log_divider = 0;

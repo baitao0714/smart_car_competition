@@ -13,6 +13,7 @@
 #define LQ_DEMO_IMAGE 7
 #define LQ_DEMO_IMAGE_MOTOR 8
 #define LQ_DEMO_MOTOR_ENCODER 9
+#define LQ_DEMO_BRUSHLESS 10
 
 #ifndef LQ_APP_TARGET
 #define LQ_APP_TARGET LQ_APP_CAR_RUNTIME // eg: LQ_APP_CAR_RUNTIME / LQ_APP_NONE
@@ -29,9 +30,9 @@ int main() {
 	(void)CarRuntime_RunCameraLoop(
 	    true, 320, 240, 90, 1000, 20 * 1000,
 	    // 白涛ip
-	    //  20 * 1000, true, "192.168.193.117", 8080, 30, 33);
+	      20 * 1000, true, "192.168.193.117", 8080, 30, 33);
 	    // 林哥ip
-	    20 * 1000, true, "192.168.193.172", 8080, 30, 33);
+	    //20 * 1000, true, "192.168.193.172", 8080, 30, 33);
 #else
 	(void)CarRuntime_RunCameraLoop(true, 320, 240, 90, 1000, 20 * 1000,
 	                               20 * 1000);
@@ -54,6 +55,9 @@ int main() {
 #elif LQ_DEMO_TARGET == LQ_DEMO_MOTOR
 	lq_log_info("Run demo: motor");
 	lq_motor_demo();
+#elif LQ_DEMO_TARGET == LQ_DEMO_BRUSHLESS
+	lq_log_info("Run demo: brushless");
+	lq_brushless_demo();
 #elif LQ_DEMO_TARGET == LQ_DEMO_IMAGE
 	lq_log_info("Run demo: image");
 	lq_image_demo();
