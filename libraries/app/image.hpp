@@ -206,6 +206,12 @@ typedef struct {
   int16_t red_min_area;
   int16_t white_trigger_percent;
   int16_t stable_frames_need;
+	int16_t red_h1_min;
+	int16_t red_h1_max;
+	int16_t red_h2_min;
+	int16_t red_h2_max;
+	int16_t red_s_min;
+	int16_t red_v_min;
   int16_t roi_width_scale_percent;
   int16_t roi_height_scale_percent;
   int16_t roi_gap_pixels;

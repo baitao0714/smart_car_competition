@@ -106,6 +106,12 @@ void LoadElementConfigImpl(const char* path) {
 		ofs << "red_min_area=200\n";
 		ofs << "white_trigger_percent=90\n";
 		ofs << "stable_frames_need=2\n";
+		ofs << "red_h1_min=0\n";
+		ofs << "red_h1_max=10\n";
+		ofs << "red_h2_min=156\n";
+		ofs << "red_h2_max=180\n";
+		ofs << "red_s_min=80\n";
+		ofs << "red_v_min=60\n";
 		ofs << "roi_width_scale_percent=220\n";
 		ofs << "roi_height_scale_percent=180\n";
 		ofs << "roi_gap_pixels=4\n";
@@ -129,6 +135,12 @@ void LoadElementConfigImpl(const char* path) {
 		if (key == "red_min_area") ElementDetect.red_min_area = static_cast<int16_t>(iv);
 		else if (key == "white_trigger_percent") ElementDetect.white_trigger_percent = static_cast<int16_t>(iv);
 		else if (key == "stable_frames_need") ElementDetect.stable_frames_need = static_cast<int16_t>(iv);
+		else if (key == "red_h1_min") ElementDetect.red_h1_min = static_cast<int16_t>(iv);
+		else if (key == "red_h1_max") ElementDetect.red_h1_max = static_cast<int16_t>(iv);
+		else if (key == "red_h2_min") ElementDetect.red_h2_min = static_cast<int16_t>(iv);
+		else if (key == "red_h2_max") ElementDetect.red_h2_max = static_cast<int16_t>(iv);
+		else if (key == "red_s_min") ElementDetect.red_s_min = static_cast<int16_t>(iv);
+		else if (key == "red_v_min") ElementDetect.red_v_min = static_cast<int16_t>(iv);
 		else if (key == "roi_width_scale_percent") ElementDetect.roi_width_scale_percent = static_cast<int16_t>(iv);
 		else if (key == "roi_height_scale_percent") ElementDetect.roi_height_scale_percent = static_cast<int16_t>(iv);
 		else if (key == "roi_gap_pixels") ElementDetect.roi_gap_pixels = static_cast<int16_t>(iv);
@@ -139,9 +151,11 @@ void LoadElementConfigImpl(const char* path) {
 	ifs.close();
 	struct stat st;
 	if (stat(path, &st) == 0) g_element_cfg_mtime = st.st_mtime;
-	std::printf("Loaded element config from %s: enable=%d red_min_area=%d white_trigger=%d stable_frames=%d roi_w%%=%d roi_h%%=%d gap=%d\n",
+	std::printf("Loaded element config from %s: enable=%d red_min_area=%d white_trigger=%d stable_frames=%d hsv=[%d-%d,%d-%d,s>=%d,v>=%d] roi_w%%=%d roi_h%%=%d gap=%d\n",
 		path, ElementDetect.enable, ElementDetect.red_min_area, ElementDetect.white_trigger_percent,
-		ElementDetect.stable_frames_need, ElementDetect.roi_width_scale_percent,
+		ElementDetect.stable_frames_need, ElementDetect.red_h1_min, ElementDetect.red_h1_max,
+		ElementDetect.red_h2_min, ElementDetect.red_h2_max, ElementDetect.red_s_min,
+		ElementDetect.red_v_min, ElementDetect.roi_width_scale_percent,
 		ElementDetect.roi_height_scale_percent, ElementDetect.roi_gap_pixels);
 }
 
@@ -191,8 +205,14 @@ static bool DetectRedMarker(const cv::Mat& frame, cv::Rect& marker_rect,
 	cv::Mat mask1;
 	cv::Mat mask2;
 	cv::Mat red_mask;
-	cv::inRange(hsv, cv::Scalar(0, 80, 60), cv::Scalar(10, 255, 255), mask1);
-	cv::inRange(hsv, cv::Scalar(156, 80, 60), cv::Scalar(180, 255, 255), mask2);
+	const int h1_min = std::max(0, std::min(180, static_cast<int>(ElementDetect.red_h1_min)));
+	const int h1_max = std::max(0, std::min(180, static_cast<int>(ElementDetect.red_h1_max)));
+	const int h2_min = std::max(0, std::min(180, static_cast<int>(ElementDetect.red_h2_min)));
+	const int h2_max = std::max(0, std::min(180, static_cast<int>(ElementDetect.red_h2_max)));
+	const int s_min = std::max(0, std::min(255, static_cast<int>(ElementDetect.red_s_min)));
+	const int v_min = std::max(0, std::min(255, static_cast<int>(ElementDetect.red_v_min)));
+	cv::inRange(hsv, cv::Scalar(h1_min, s_min, v_min), cv::Scalar(h1_max, 255, 255), mask1);
+	cv::inRange(hsv, cv::Scalar(h2_min, s_min, v_min), cv::Scalar(h2_max, 255, 255), mask2);
 	cv::bitwise_or(mask1, mask2, red_mask);
 	cv::morphologyEx(red_mask, red_mask, cv::MORPH_CLOSE,
 					 cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
@@ -527,6 +547,12 @@ void Data_Settings(void) {
 	ElementDetect.red_min_area = 200;
 	ElementDetect.white_trigger_percent = 90;
 	ElementDetect.stable_frames_need = 2;
+	ElementDetect.red_h1_min = 0;
+	ElementDetect.red_h1_max = 10;
+	ElementDetect.red_h2_min = 156;
+	ElementDetect.red_h2_max = 180;
+	ElementDetect.red_s_min = 80;
+	ElementDetect.red_v_min = 60;
 	ElementDetect.roi_width_scale_percent = 220;
 	ElementDetect.roi_height_scale_percent = 180;
 	ElementDetect.roi_gap_pixels = 4;
