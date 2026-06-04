@@ -14,21 +14,13 @@
 namespace {
 #ifdef LQ_HAVE_OPENCV
 static bool CarRuntime_BuildGrayOverlayFrame(cv::Mat& out_bgr) {
-	if (Gray_image.empty()) {
+	// 使用原始的彩色缩放图作为 overlay 底图，而不是二值图。
+	// 这样上位机看到的是原图（彩色），但巡线处理仍使用二值化数据不变。
+	if (Resized_image.empty()) {
 		return false;
 	}
-	// 灰度图转三通道，便于彩色画线
-	// cv::cvtColor(Gray_image, out_bgr, cv::COLOR_GRAY2BGR);
-	// 用二值化结果 Pixle 生成显示底图
-	cv::Mat bin_img(LCDH, LCDW, CV_8UC1);
-	for (int y = 0; y < LCDH; ++y) {
-		for (int x = 0; x < LCDW; ++x) {
-			bin_img.at<uint8_t>(y, x) = Pixle[y][x] ? 255 : 0;
-		}
-	}
-
-	// 二值图转三通道，便于彩色画线
-	cv::cvtColor(bin_img, out_bgr, cv::COLOR_GRAY2BGR);
+	// 不修改全局 Resized_image，复制到 out_bgr
+	out_bgr = Resized_image.clone();
 
 	const int rows = out_bgr.rows;
 	const int cols = out_bgr.cols;

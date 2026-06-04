@@ -422,11 +422,6 @@ static void UpdateElementDetectState(const cv::Mat& frame) {
 	ElementDetect.class_id = static_cast<int16_t>(class_id);
 	ElementDetect.route_mode = static_cast<int16_t>(ClassToRouteMode(class_id));
 	SystemData.Model = class_id;
-	std::printf("ElementDetect: marker=(%d,%d,%d,%d) roi=(%d,%d,%d,%d) white=%d%% class=%s\n",
-			ElementDetect.red_x, ElementDetect.red_y, ElementDetect.red_w,
-			ElementDetect.red_h, ElementDetect.roi_x, ElementDetect.roi_y,
-			ElementDetect.roi_w, ElementDetect.roi_h, ElementDetect.white_ratio,
-			ElementClassName(class_id));
 } // namespace
 
 const char* RoadTypeToString(RoadType_e type) {
@@ -2541,15 +2536,6 @@ void ImageProcess(void) {
 	// Stop_Test();           // 过桥保护   出环后  确保已经过环
 	GetDet(); // 获取动态前瞻 并计算图像偏差 3us
 
-	// 刷屏式打印环岛调试信息（每帧打印）
-	std::printf("RingInfo: LeftP1=%d LeftP2=%d RightP1=%d RightP2=%d rings=%d flag=%d\n",
-	            Left_RingsFlag_Point1_Ysite,
-	            Left_RingsFlag_Point2_Ysite,
-	            Right_RingsFlag_Point1_Ysite,
-	            Right_RingsFlag_Point2_Ysite,
-	            static_cast<int>(ImageFlag.image_element_rings),
-	            static_cast<int>(ImageFlag.image_element_rings_flag));
-
 	if (++image_debug_log_divider >= 30) {
 		image_debug_log_divider = 0;
 		std::printf(
@@ -2562,6 +2548,11 @@ void ImageProcess(void) {
 		    RoadTypeToString(ImageStatus.Road_type),
 		    static_cast<unsigned int>(ImageFlag.image_element_rings_flag),
 		    static_cast<unsigned int>(Ring_Help_Flag));
+		std::printf("ElementDetect: marker=(%d,%d,%d,%d) roi=(%d,%d,%d,%d) white=%d%% class=%s\n",
+			ElementDetect.red_x, ElementDetect.red_y, ElementDetect.red_w,
+			ElementDetect.red_h, ElementDetect.roi_x, ElementDetect.roi_y,
+			ElementDetect.roi_w, ElementDetect.roi_h, ElementDetect.white_ratio,
+			ElementClassName(class_id));	
 	}
 
 	// if (++draw_line_divider >= 30)
