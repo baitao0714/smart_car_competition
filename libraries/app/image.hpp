@@ -197,34 +197,34 @@ typedef struct {
 } ImageFlagtypedef;
 
 typedef struct {
-  int16_t enable;
-  int16_t red_found;
-  int16_t stable_frames;
-  int16_t white_ratio;
-  int16_t class_id;
-  int16_t route_mode;
-  int16_t red_min_area;
-  int16_t white_trigger_percent;
-  int16_t stable_frames_need;
+	int16_t enable;
+	int16_t red_found;
+	int16_t stable_frames;
+	int16_t white_ratio;
+	int16_t class_id;
+	int16_t route_mode;
+	int16_t red_min_area;
+	int16_t white_trigger_percent;
+	int16_t stable_frames_need;
 	int16_t red_h1_min;
 	int16_t red_h1_max;
 	int16_t red_h2_min;
 	int16_t red_h2_max;
 	int16_t red_s_min;
 	int16_t red_v_min;
-  int16_t roi_width_scale_percent;
-  int16_t roi_height_scale_percent;
-  int16_t roi_gap_pixels;
-  int16_t roi_x_offset_pixels;
-  int16_t roi_y_offset_pixels;
-  int16_t red_x;
-  int16_t red_y;
-  int16_t red_w;
-  int16_t red_h;
-  int16_t roi_x;
-  int16_t roi_y;
-  int16_t roi_w;
-  int16_t roi_h;
+	int16_t roi_width_scale_percent;
+	int16_t roi_height_scale_percent;
+	int16_t roi_gap_pixels;
+	int16_t roi_x_offset_pixels;
+	int16_t roi_y_offset_pixels;
+	int16_t red_x;
+	int16_t red_y;
+	int16_t red_w;
+	int16_t red_h;
+	int16_t roi_x;
+	int16_t roi_y;
+	int16_t roi_w;
+	int16_t roi_h;
 } ElementDetectDatatypedef;
 
 extern ImageStatustypedef ImageStatus;
@@ -233,6 +233,13 @@ extern ImageDealDatatypedef ImageDeal[LCDH];
 extern ImageFlagtypedef ImageFlag;
 extern ElementDetectDatatypedef ElementDetect;
 extern ImageStatustypedef ImageData;
+
+// Crop config (hot-loadable)
+extern int CropCutWidth;
+extern int CropCutHeight;
+
+void LoadCropConfig(const char* path);
+void CropConfigReloadIfNeeded(const char* path);
 
 float my_abs(float x);
 void Data_Settings(void);

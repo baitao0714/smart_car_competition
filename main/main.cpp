@@ -28,11 +28,11 @@ int main() {
 #if LQ_APP_TARGET == LQ_APP_CAR_RUNTIME
 #if defined(CAR_RUNTIME_HAS_UDP)
 	(void)CarRuntime_RunCameraLoop(
-	    true, 320, 240, 90, 1000, 20 * 1000,
+	    true, 320, 240, 120, 1000, 20 * 1000,
 	    // 白涛ip
-	      20 * 1000, true, "192.168.148.117", 8080, 30, 33);
+	    //   20 * 1000, true, "192.168.148.117", 8080, 30, 33);
 	    // 林哥ip
-	    //20 * 1000, true, "192.168.193.172", 8080, 30, 33);
+	    20 * 1000, true, "192.168.148.172", 8080, 60, 33);
 #else
 	(void)CarRuntime_RunCameraLoop(true, 320, 240, 90, 1000, 20 * 1000,
 	                               20 * 1000);

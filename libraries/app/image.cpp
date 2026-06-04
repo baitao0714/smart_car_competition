@@ -87,6 +87,8 @@ float my_abs(float x) {
 namespace {
 static time_t g_element_cfg_mtime = 0;
 static const char* kElementConfigPath = "element_roi.conf";
+static time_t g_crop_cfg_mtime = 0;
+static const char* kCropConfigPath = "line_crop.conf";
 
 static std::string Trim(const std::string& s) {
 	const char* ws = " \t\r\n";
@@ -207,6 +209,81 @@ void LoadElementConfig(const char* path) { LoadElementConfigImpl(path); }
 void ElementConfigReloadIfNeeded(const char* path) {
 	ElementConfigReloadIfNeededImpl(path);
 }
+
+// Crop config implementation
+static int g_default_cut_width = 160;
+static int g_default_cut_height = 60;
+int CropCutWidth = g_default_cut_width;
+int CropCutHeight = g_default_cut_height;
+
+namespace {
+void LoadCropConfigImpl(const char* path) {
+	std::ifstream ifs(path);
+	if (!ifs.is_open()) {
+		std::ofstream ofs(path);
+		if (!ofs.is_open())
+			return;
+		ofs << "# line crop config (hot-loaded)\n";
+		ofs << "# cut_width: crop width in pixels\n";
+		ofs << "# cut_height: crop height in pixels\n";
+		ofs << "cut_width=160\n";
+		ofs << "cut_height=60\n";
+		ofs.close();
+		CropCutWidth = g_default_cut_width;
+		CropCutHeight = g_default_cut_height;
+		return;
+	}
+
+	std::string line;
+	int cw = g_default_cut_width;
+	int ch = g_default_cut_height;
+	while (std::getline(ifs, line)) {
+		line = Trim(line);
+		if (line.empty() || line[0] == '#')
+			continue;
+		auto pos = line.find('=');
+		if (pos == std::string::npos)
+			continue;
+		auto key = Trim(line.substr(0, pos));
+		auto val = Trim(line.substr(pos + 1));
+		int iv = 0;
+		try {
+			iv = std::stoi(val);
+		} catch (...) {
+			continue;
+		}
+		if (key == "cut_width")
+			cw = iv;
+		else if (key == "cut_height")
+			ch = iv;
+	}
+	ifs.close();
+	CropCutWidth = std::max(1, std::min(cw, 4000));
+	CropCutHeight = std::max(1, std::min(ch, 4000));
+	struct stat st;
+	if (stat(path, &st) == 0)
+		g_crop_cfg_mtime = st.st_mtime;
+	std::printf("Loaded crop config from %s: cut_width=%d cut_height=%d\n",
+	            path, CropCutWidth, CropCutHeight);
+}
+
+void CropConfigReloadIfNeededImpl(const char* path) {
+	struct stat st;
+	if (stat(path, &st) != 0) {
+		LoadCropConfig(path);
+		return;
+	}
+	if (st.st_mtime != g_crop_cfg_mtime) {
+		LoadCropConfig(path);
+	}
+}
+} // namespace
+
+void LoadCropConfig(const char* path) { LoadCropConfigImpl(path); }
+
+void CropConfigReloadIfNeeded(const char* path) {
+	CropConfigReloadIfNeededImpl(path);
+}
 #endif
 
 static cv::Rect ClampRect(const cv::Rect& rect, const cv::Size& size) {
@@ -273,7 +350,7 @@ static bool DetectRedMarker(const cv::Mat& frame, cv::Rect& marker_rect,
 
 		const float aspect =
 		    static_cast<float>(rect.width) / static_cast<float>(rect.height);
-		if (aspect < 0.2f || aspect > 10.0f) {
+		if (aspect < 0.2f || aspect > 20.0f) {
 			continue;
 		}
 
@@ -524,8 +601,10 @@ static void Image_Process() {
 		return;
 	}
 
-	const int cut_width = 160;
-	const int cut_height = 60;
+	// reload crop config if changed
+	CropConfigReloadIfNeeded(kCropConfigPath);
+	const int cut_width = CropCutWidth;
+	const int cut_height = CropCutHeight;
 	if (First_image.cols < cut_width || First_image.rows < cut_height) {
 		Gray_image.release();
 		Cut_image.release();

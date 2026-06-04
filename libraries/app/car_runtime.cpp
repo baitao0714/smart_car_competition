@@ -42,14 +42,18 @@ static bool CarRuntime_BuildGrayOverlayFrame(cv::Mat& out_bgr) {
 
 	// 为了上位机看得清，放大到 160x120
 
-	// 在 overlay 上绘制 ElementDetect 的 ROI（如果存在），把 First_image 坐标映射到当前 out_bgr
-	if (ElementDetect.enable && ElementDetect.red_found && !First_image.empty()) {
-		const int cut_width = 160;
-		const int cut_height = 60;
+	// 在 overlay 上绘制 ElementDetect 的 ROI（如果存在），把 First_image
+	// 坐标映射到当前 out_bgr
+	if (ElementDetect.enable && ElementDetect.red_found &&
+	    !First_image.empty()) {
+		const int cut_width = CropCutWidth;
+		const int cut_height = CropCutHeight;
 		int cut_x = std::max(0, (First_image.cols - cut_width) / 2);
 		int cut_y = std::max(0, (First_image.rows - cut_height) / 2);
-		float sx = static_cast<float>(out_bgr.cols) / static_cast<float>(cut_width);
-		float sy = static_cast<float>(out_bgr.rows) / static_cast<float>(cut_height);
+		float sx =
+		    static_cast<float>(out_bgr.cols) / static_cast<float>(cut_width);
+		float sy =
+		    static_cast<float>(out_bgr.rows) / static_cast<float>(cut_height);
 
 		// marker (red)
 		int mx = ElementDetect.red_x - cut_x;
