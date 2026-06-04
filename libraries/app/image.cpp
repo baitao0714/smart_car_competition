@@ -4,12 +4,12 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <iostream>
-#include <string>
-#include <fstream>
-#include <sstream>
-#include <sys/stat.h>
 #include <ctime>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <sys/stat.h>
 
 #ifdef LQ_HAVE_OPENCV
 #include <opencv2/imgproc.hpp>
@@ -91,7 +91,8 @@ static const char* kElementConfigPath = "element_roi.conf";
 static std::string Trim(const std::string& s) {
 	const char* ws = " \t\r\n";
 	auto start = s.find_first_not_of(ws);
-	if (start == std::string::npos) return std::string();
+	if (start == std::string::npos)
+		return std::string();
 	auto end = s.find_last_not_of(ws);
 	return s.substr(start, end - start + 1);
 }
@@ -101,7 +102,8 @@ void LoadElementConfigImpl(const char* path) {
 	if (!ifs.is_open()) {
 		// create default config file
 		std::ofstream ofs(path);
-		if (!ofs.is_open()) return;
+		if (!ofs.is_open())
+			return;
 		ofs << "# element ROI config\n";
 		ofs << "red_min_area=200\n";
 		ofs << "white_trigger_percent=90\n";
@@ -125,38 +127,65 @@ void LoadElementConfigImpl(const char* path) {
 	std::string line;
 	while (std::getline(ifs, line)) {
 		line = Trim(line);
-		if (line.empty() || line[0] == '#') continue;
+		if (line.empty() || line[0] == '#')
+			continue;
 		auto pos = line.find('=');
-		if (pos == std::string::npos) continue;
+		if (pos == std::string::npos)
+			continue;
 		auto key = Trim(line.substr(0, pos));
 		auto val = Trim(line.substr(pos + 1));
 		int iv = 0;
-		try { iv = std::stoi(val); } catch(...) { continue; }
-		if (key == "red_min_area") ElementDetect.red_min_area = static_cast<int16_t>(iv);
-		else if (key == "white_trigger_percent") ElementDetect.white_trigger_percent = static_cast<int16_t>(iv);
-		else if (key == "stable_frames_need") ElementDetect.stable_frames_need = static_cast<int16_t>(iv);
-		else if (key == "red_h1_min") ElementDetect.red_h1_min = static_cast<int16_t>(iv);
-		else if (key == "red_h1_max") ElementDetect.red_h1_max = static_cast<int16_t>(iv);
-		else if (key == "red_h2_min") ElementDetect.red_h2_min = static_cast<int16_t>(iv);
-		else if (key == "red_h2_max") ElementDetect.red_h2_max = static_cast<int16_t>(iv);
-		else if (key == "red_s_min") ElementDetect.red_s_min = static_cast<int16_t>(iv);
-		else if (key == "red_v_min") ElementDetect.red_v_min = static_cast<int16_t>(iv);
-		else if (key == "roi_width_scale_percent") ElementDetect.roi_width_scale_percent = static_cast<int16_t>(iv);
-		else if (key == "roi_height_scale_percent") ElementDetect.roi_height_scale_percent = static_cast<int16_t>(iv);
-		else if (key == "roi_gap_pixels") ElementDetect.roi_gap_pixels = static_cast<int16_t>(iv);
-		else if (key == "roi_x_offset_pixels") ElementDetect.roi_x_offset_pixels = static_cast<int16_t>(iv);
-		else if (key == "roi_y_offset_pixels") ElementDetect.roi_y_offset_pixels = static_cast<int16_t>(iv);
-		else if (key == "enable") ElementDetect.enable = static_cast<int16_t>(iv);
+		try {
+			iv = std::stoi(val);
+		} catch (...) {
+			continue;
+		}
+		if (key == "red_min_area")
+			ElementDetect.red_min_area = static_cast<int16_t>(iv);
+		else if (key == "white_trigger_percent")
+			ElementDetect.white_trigger_percent = static_cast<int16_t>(iv);
+		else if (key == "stable_frames_need")
+			ElementDetect.stable_frames_need = static_cast<int16_t>(iv);
+		else if (key == "red_h1_min")
+			ElementDetect.red_h1_min = static_cast<int16_t>(iv);
+		else if (key == "red_h1_max")
+			ElementDetect.red_h1_max = static_cast<int16_t>(iv);
+		else if (key == "red_h2_min")
+			ElementDetect.red_h2_min = static_cast<int16_t>(iv);
+		else if (key == "red_h2_max")
+			ElementDetect.red_h2_max = static_cast<int16_t>(iv);
+		else if (key == "red_s_min")
+			ElementDetect.red_s_min = static_cast<int16_t>(iv);
+		else if (key == "red_v_min")
+			ElementDetect.red_v_min = static_cast<int16_t>(iv);
+		else if (key == "roi_width_scale_percent")
+			ElementDetect.roi_width_scale_percent = static_cast<int16_t>(iv);
+		else if (key == "roi_height_scale_percent")
+			ElementDetect.roi_height_scale_percent = static_cast<int16_t>(iv);
+		else if (key == "roi_gap_pixels")
+			ElementDetect.roi_gap_pixels = static_cast<int16_t>(iv);
+		else if (key == "roi_x_offset_pixels")
+			ElementDetect.roi_x_offset_pixels = static_cast<int16_t>(iv);
+		else if (key == "roi_y_offset_pixels")
+			ElementDetect.roi_y_offset_pixels = static_cast<int16_t>(iv);
+		else if (key == "enable")
+			ElementDetect.enable = static_cast<int16_t>(iv);
 	}
 	ifs.close();
 	struct stat st;
-	if (stat(path, &st) == 0) g_element_cfg_mtime = st.st_mtime;
-	std::printf("Loaded element config from %s: enable=%d red_min_area=%d white_trigger=%d stable_frames=%d hsv=[%d-%d,%d-%d,s>=%d,v>=%d] roi_w%%=%d roi_h%%=%d gap=%d\n",
-		path, ElementDetect.enable, ElementDetect.red_min_area, ElementDetect.white_trigger_percent,
-		ElementDetect.stable_frames_need, ElementDetect.red_h1_min, ElementDetect.red_h1_max,
-		ElementDetect.red_h2_min, ElementDetect.red_h2_max, ElementDetect.red_s_min,
-		ElementDetect.red_v_min, ElementDetect.roi_width_scale_percent,
-		ElementDetect.roi_height_scale_percent, ElementDetect.roi_gap_pixels);
+	if (stat(path, &st) == 0)
+		g_element_cfg_mtime = st.st_mtime;
+	std::printf("Loaded element config from %s: enable=%d red_min_area=%d "
+	            "white_trigger=%d stable_frames=%d "
+	            "hsv=[%d-%d,%d-%d,s>=%d,v>=%d] roi_w%%=%d roi_h%%=%d gap=%d\n",
+	            path, ElementDetect.enable, ElementDetect.red_min_area,
+	            ElementDetect.white_trigger_percent,
+	            ElementDetect.stable_frames_need, ElementDetect.red_h1_min,
+	            ElementDetect.red_h1_max, ElementDetect.red_h2_min,
+	            ElementDetect.red_h2_max, ElementDetect.red_s_min,
+	            ElementDetect.red_v_min, ElementDetect.roi_width_scale_percent,
+	            ElementDetect.roi_height_scale_percent,
+	            ElementDetect.roi_gap_pixels);
 }
 
 void ElementConfigReloadIfNeededImpl(const char* path) {
@@ -173,9 +202,7 @@ void ElementConfigReloadIfNeededImpl(const char* path) {
 } // namespace
 
 // Public wrappers with external linkage
-void LoadElementConfig(const char* path) {
-	LoadElementConfigImpl(path);
-}
+void LoadElementConfig(const char* path) { LoadElementConfigImpl(path); }
 
 void ElementConfigReloadIfNeeded(const char* path) {
 	ElementConfigReloadIfNeededImpl(path);
@@ -194,7 +221,7 @@ static cv::Rect ClampRect(const cv::Rect& rect, const cv::Size& size) {
 }
 
 static bool DetectRedMarker(const cv::Mat& frame, cv::Rect& marker_rect,
-							float& red_fill_ratio) {
+                            float& red_fill_ratio) {
 	if (frame.empty()) {
 		return false;
 	}
@@ -205,23 +232,31 @@ static bool DetectRedMarker(const cv::Mat& frame, cv::Rect& marker_rect,
 	cv::Mat mask1;
 	cv::Mat mask2;
 	cv::Mat red_mask;
-	const int h1_min = std::max(0, std::min(180, static_cast<int>(ElementDetect.red_h1_min)));
-	const int h1_max = std::max(0, std::min(180, static_cast<int>(ElementDetect.red_h1_max)));
-	const int h2_min = std::max(0, std::min(180, static_cast<int>(ElementDetect.red_h2_min)));
-	const int h2_max = std::max(0, std::min(180, static_cast<int>(ElementDetect.red_h2_max)));
-	const int s_min = std::max(0, std::min(255, static_cast<int>(ElementDetect.red_s_min)));
-	const int v_min = std::max(0, std::min(255, static_cast<int>(ElementDetect.red_v_min)));
-	cv::inRange(hsv, cv::Scalar(h1_min, s_min, v_min), cv::Scalar(h1_max, 255, 255), mask1);
-	cv::inRange(hsv, cv::Scalar(h2_min, s_min, v_min), cv::Scalar(h2_max, 255, 255), mask2);
+	const int h1_min =
+	    std::max(0, std::min(180, static_cast<int>(ElementDetect.red_h1_min)));
+	const int h1_max =
+	    std::max(0, std::min(180, static_cast<int>(ElementDetect.red_h1_max)));
+	const int h2_min =
+	    std::max(0, std::min(180, static_cast<int>(ElementDetect.red_h2_min)));
+	const int h2_max =
+	    std::max(0, std::min(180, static_cast<int>(ElementDetect.red_h2_max)));
+	const int s_min =
+	    std::max(0, std::min(255, static_cast<int>(ElementDetect.red_s_min)));
+	const int v_min =
+	    std::max(0, std::min(255, static_cast<int>(ElementDetect.red_v_min)));
+	cv::inRange(hsv, cv::Scalar(h1_min, s_min, v_min),
+	            cv::Scalar(h1_max, 255, 255), mask1);
+	cv::inRange(hsv, cv::Scalar(h2_min, s_min, v_min),
+	            cv::Scalar(h2_max, 255, 255), mask2);
 	cv::bitwise_or(mask1, mask2, red_mask);
 	cv::morphologyEx(red_mask, red_mask, cv::MORPH_CLOSE,
-					 cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
+	                 cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
 	cv::morphologyEx(red_mask, red_mask, cv::MORPH_OPEN,
-					 cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
+	                 cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
 
 	std::vector<std::vector<cv::Point>> contours;
 	cv::findContours(red_mask, contours, cv::RETR_EXTERNAL,
-					 cv::CHAIN_APPROX_SIMPLE);
+	                 cv::CHAIN_APPROX_SIMPLE);
 
 	double best_area = 0.0;
 	marker_rect = cv::Rect();
@@ -236,8 +271,8 @@ static bool DetectRedMarker(const cv::Mat& frame, cv::Rect& marker_rect,
 			continue;
 		}
 
-		const float aspect = static_cast<float>(rect.width) /
-							 static_cast<float>(rect.height);
+		const float aspect =
+		    static_cast<float>(rect.width) / static_cast<float>(rect.height);
 		if (aspect < 0.2f || aspect > 10.0f) {
 			continue;
 		}
@@ -252,23 +287,27 @@ static bool DetectRedMarker(const cv::Mat& frame, cv::Rect& marker_rect,
 		return false;
 	}
 
-	red_fill_ratio = static_cast<float>(best_area) /
-					 static_cast<float>(marker_rect.area());
+	red_fill_ratio =
+	    static_cast<float>(best_area) / static_cast<float>(marker_rect.area());
 	return true;
 }
 
 static cv::Rect BuildClassifyRoi(const cv::Rect& marker_rect,
-								 const cv::Size& frame_size) {
+                                 const cv::Size& frame_size) {
 	if (marker_rect.width <= 0 || marker_rect.height <= 0) {
 		return cv::Rect();
 	}
 
-	const int roi_width = std::max(1, marker_rect.width * ElementDetect.roi_width_scale_percent / 100);
-	const int roi_height = std::max(1, marker_rect.height * ElementDetect.roi_height_scale_percent / 100);
+	const int roi_width = std::max(
+	    1, marker_rect.width * ElementDetect.roi_width_scale_percent / 100);
+	const int roi_height = std::max(
+	    1, marker_rect.height * ElementDetect.roi_height_scale_percent / 100);
 	const int center_x = marker_rect.x + marker_rect.width / 2;
-	const int roi_x = center_x - roi_width / 2 + ElementDetect.roi_x_offset_pixels;
-	const int roi_y = marker_rect.y - roi_height - ElementDetect.roi_gap_pixels +
-						 ElementDetect.roi_y_offset_pixels;
+	const int roi_x =
+	    center_x - roi_width / 2 + ElementDetect.roi_x_offset_pixels;
+	const int roi_y = marker_rect.y - roi_height -
+	                  ElementDetect.roi_gap_pixels +
+	                  ElementDetect.roi_y_offset_pixels;
 
 	return ClampRect(cv::Rect(roi_x, roi_y, roi_width, roi_height), frame_size);
 }
@@ -298,7 +337,7 @@ static int ClassifyElementPatch(const cv::Mat& patch) {
 
 	std::vector<std::vector<cv::Point>> contours;
 	cv::findContours(bin_img, contours, cv::RETR_EXTERNAL,
-					 cv::CHAIN_APPROX_SIMPLE);
+	                 cv::CHAIN_APPROX_SIMPLE);
 
 	cv::Rect largest_rect;
 	double largest_area = 0.0;
@@ -313,13 +352,13 @@ static int ClassifyElementPatch(const cv::Mat& patch) {
 	float aspect_ratio = 1.0f;
 	if (largest_rect.width > 0 && largest_rect.height > 0) {
 		aspect_ratio = static_cast<float>(largest_rect.width) /
-					   static_cast<float>(largest_rect.height);
+		               static_cast<float>(largest_rect.height);
 	}
 
 	cv::Mat edges;
 	cv::Canny(gray, edges, 60, 160);
 	const float edge_density = static_cast<float>(cv::countNonZero(edges)) /
-						   static_cast<float>(total_pixels);
+	                           static_cast<float>(total_pixels);
 
 	if (white_ratio > 0.82f && edge_density < 0.05f) {
 		return 0; // 物资
@@ -403,15 +442,16 @@ static void UpdateElementDetectState(const cv::Mat& frame) {
 	}
 
 	cv::Mat bin_img;
-	cv::threshold(marker_gray, bin_img, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+	cv::threshold(marker_gray, bin_img, 0, 255,
+	              cv::THRESH_BINARY | cv::THRESH_OTSU);
 	const double white_pixels = static_cast<double>(cv::countNonZero(bin_img));
 	const double total_pixels = static_cast<double>(bin_img.total());
 	if (total_pixels <= 0.0) {
 		return;
 	}
 
-	const int white_ratio_percent = static_cast<int>(std::lround(
-		100.0 * white_pixels / total_pixels));
+	const int white_ratio_percent =
+	    static_cast<int>(std::lround(100.0 * white_pixels / total_pixels));
 	ElementDetect.white_ratio = static_cast<int16_t>(white_ratio_percent);
 
 	if (white_ratio_percent >= ElementDetect.white_trigger_percent) {
@@ -1666,8 +1706,7 @@ void Element_Judgment_Left_Rings() {
 
 		ImageStatus.Road_type = LeftCirque;
 		std::printf("LeftRing detect: P1=%d P2=%d rings=%d flag=%d\n",
-		            Left_RingsFlag_Point1_Ysite,
-		            Left_RingsFlag_Point2_Ysite,
+		            Left_RingsFlag_Point1_Ysite, Left_RingsFlag_Point2_Ysite,
 		            static_cast<int>(ImageFlag.image_element_rings),
 		            static_cast<int>(ImageFlag.image_element_rings_flag));
 		// gpio_set_level(P20_8, 0);
@@ -1755,8 +1794,7 @@ void Element_Judgment_Right_Rings() {
 		SystemData.Stop = 1;
 		ImageStatus.Road_type = RightCirque;
 		std::printf("RightRing detect: P1=%d P2=%d rings=%d flag=%d\n",
-		            Right_RingsFlag_Point1_Ysite,
-		            Right_RingsFlag_Point2_Ysite,
+		            Right_RingsFlag_Point1_Ysite, Right_RingsFlag_Point2_Ysite,
 		            static_cast<int>(ImageFlag.image_element_rings),
 		            static_cast<int>(ImageFlag.image_element_rings_flag));
 		//        flag_ceshi++;
@@ -2574,11 +2612,13 @@ void ImageProcess(void) {
 		    RoadTypeToString(ImageStatus.Road_type),
 		    static_cast<unsigned int>(ImageFlag.image_element_rings_flag),
 		    static_cast<unsigned int>(Ring_Help_Flag));
-		std::printf("ElementDetect: marker=(%d,%d,%d,%d) roi=(%d,%d,%d,%d) white=%d%% class=%s\n",
-			ElementDetect.red_x, ElementDetect.red_y, ElementDetect.red_w,
-			ElementDetect.red_h, ElementDetect.roi_x, ElementDetect.roi_y,
-			ElementDetect.roi_w, ElementDetect.roi_h, ElementDetect.white_ratio,
-			ElementClassName(class_id));	
+		std::printf(
+		    "ElementDetect: marker=(%d,%d,%d,%d) roi=(%d,%d,%d,%d) white=%d%% "
+		    "class=%s\n",
+		    ElementDetect.red_x, ElementDetect.red_y, ElementDetect.red_w,
+		    ElementDetect.red_h, ElementDetect.roi_x, ElementDetect.roi_y,
+		    ElementDetect.roi_w, ElementDetect.roi_h, ElementDetect.white_ratio,
+		    ElementClassName(ElementDetect.class_id));
 	}
 
 	// if (++draw_line_divider >= 30)
