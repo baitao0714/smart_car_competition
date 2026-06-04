@@ -1,0 +1,58 @@
+#include "brushless.hpp"
+
+#include <algorithm>
+#include <memory>
+
+Brushless::Brushless()
+    : duty(0), initialized(false)
+{
+}
+
+Brushless::~Brushless()
+{
+    pwm.reset();
+}
+
+int Brushless::brushless_init(void)
+{
+    if (initialized && pwm) {
+        return 0;
+    }
+
+    pwm = std::make_unique<ls_pwm>(kBrushlessPin, kBrushlessPwmFreqHz, 0);
+    initialized = static_cast<bool>(pwm);
+    if (!initialized) {
+        return -1;
+    }
+
+    set_duty(0);
+    return 0;
+}
+
+uint32_t Brushless::duty_to_pwm_duty(int value) const
+{
+    const int clamped = std::clamp(value, 0, 100);
+    const uint32_t pulse_us = kBrushlessMinPulseUs +
+                               static_cast<uint32_t>(clamped) *
+                                   (kBrushlessMaxPulseUs - kBrushlessMinPulseUs) /
+                                   100U;
+    const uint32_t period_us = 1000000U / kBrushlessPwmFreqHz;
+    return pulse_us * PWM_DUTY_MAX / period_us;
+}
+
+void Brushless::set_duty(int value)
+{
+    if (!initialized || !pwm) {
+        std::cout << "设备未初始化!!!" << std::endl;
+        return;
+    }
+
+    value = std::clamp(value, 0, 100);
+    pwm->pwm_set_duty(duty_to_pwm_duty(value));
+    duty = value;
+}
+
+int Brushless::get_duty(void)
+{
+    return duty;
+}
