@@ -3,6 +3,23 @@
 #include <algorithm>
 #include <memory>
 
+namespace {
+constexpr pwm_pin_t kBrushlessPin = PWM2_PIN88;
+constexpr uint32_t kBrushlessPwmFreqHz = 50;
+constexpr uint32_t kBrushlessMinPulseUs = 1000;
+constexpr uint32_t kBrushlessMaxPulseUs = 2000;
+
+int ClampPercent(int value) {
+    if (value < 0) {
+        return 0;
+    }
+    if (value > 100) {
+        return 100;
+    }
+    return value;
+}
+} // namespace
+
 Brushless::Brushless()
     : duty(0), initialized(false)
 {
@@ -31,7 +48,7 @@ int Brushless::brushless_init(void)
 
 uint32_t Brushless::duty_to_pwm_duty(int value) const
 {
-    const int clamped = std::clamp(value, 0, 100);
+    const int clamped = ClampPercent(value);
     const uint32_t pulse_us = kBrushlessMinPulseUs +
                                static_cast<uint32_t>(clamped) *
                                    (kBrushlessMaxPulseUs - kBrushlessMinPulseUs) /
@@ -47,7 +64,7 @@ void Brushless::set_duty(int value)
         return;
     }
 
-    value = std::clamp(value, 0, 100);
+    value = ClampPercent(value);
     pwm->pwm_set_duty(duty_to_pwm_duty(value));
     duty = value;
 }

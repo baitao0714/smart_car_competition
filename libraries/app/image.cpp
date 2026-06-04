@@ -427,9 +427,7 @@ static void UpdateElementDetectState(const cv::Mat& frame) {
 			ElementDetect.red_h, ElementDetect.roi_x, ElementDetect.roi_y,
 			ElementDetect.roi_w, ElementDetect.roi_h, ElementDetect.white_ratio,
 			ElementClassName(class_id));
-}
 } // namespace
-#endif
 
 const char* RoadTypeToString(RoadType_e type) {
 	switch (type) {
