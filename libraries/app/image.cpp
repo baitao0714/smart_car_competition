@@ -59,13 +59,18 @@ int Point_Xsite, Point_Ysite;               // 顶点坐标
 int Repair_Point_Xsite, Repair_Point_Ysite; // 修复点坐标
 uint8_t* binar;                             // 灰度图像数组指针
 
+// uint8 Half_Road_Wide[60] = // 直道半宽度
+//     {
+//         4,  5,  5,  6,  6,  6,  7,  7,  8,  8,  9,  9,  10, 10, 10,
+//         11, 12, 12, 13, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 17,
+//         18, 18, 19, 19, 20, 20, 20, 21, 21, 22, 23, 23, 23, 24, 24,
+//         25, 25, 25, 26, 26, 27, 28, 28, 28, 29, 30, 31, 31, 31, 32,
+// };
 uint8 Half_Road_Wide[60] = // 直道半宽度
-    {
-        4,  5,  5,  6,  6,  6,  7,  7,  8,  8,  9,  9,  10, 10, 10,
-        11, 12, 12, 13, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 17,
-        18, 18, 19, 19, 20, 20, 20, 21, 21, 22, 23, 23, 23, 24, 24,
-        25, 25, 25, 26, 26, 27, 28, 28, 28, 29, 30, 31, 31, 31, 32,
-};
+    {5,  6,  6,  7,  7,  8,  8,  8,  9,  9,  10, 10, 11, 11, 12,
+     12, 13, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 17, 18, 18,
+     19, 19, 20, 20, 21, 21, 22, 22, 22, 23, 23, 24, 24, 25, 25,
+     26, 26, 27, 27, 27, 28, 28, 29, 29, 30, 30, 31, 31, 32, 32};
 
 uint8 Half_Bend_Wide[60] = // 弯道半宽度
     {
@@ -1718,7 +1723,7 @@ void Search_Border_OTSU(uint8 imageInput[LCDH][LCDW], uint8 Row, uint8 Col,
 // 左环岛判断
 void Element_Judgment_Left_Rings() {
 	//    Disf = 0;
-	if (ImageStatus.Right_Line > 2 || ImageStatus.Left_Line < 20 // 13
+	if (ImageStatus.Right_Line > 2 || ImageStatus.Left_Line < 13 // 13
 	    || ImageStatus.OFFLine > 2
 	    //  ||variance_acc>20
 	    // || Straight_Judge(2, 25, 45) > 1
@@ -1803,7 +1808,7 @@ void Element_Judgment_Left_Rings() {
 //  示例用法:       Element_Judgment_Right_Rings();
 //--------------------------------------------------------------
 void Element_Judgment_Right_Rings() {
-	if (ImageStatus.Left_Line > 2 || ImageStatus.Right_Line < 20 // 13
+	if (ImageStatus.Left_Line > 2 || ImageStatus.Right_Line < 13 // 13
 	    || ImageStatus.OFFLine > 2 ||
 	    // Straight_Judge(1, 20, 45) > 1
 	    //  ||variance_acc>18
@@ -2035,7 +2040,7 @@ void Element_Handle_Left_Rings() {
 	    ImageFlag.image_element_rings_flag == 4) {
 		for (int Ysite = 57; Ysite > ImageStatus.OFFLine; Ysite--) {
 			ImageDeal[Ysite].Center =
-			    ImageDeal[Ysite].RightBorder - Half_Road_Wide[Ysite] + 8;
+			    ImageDeal[Ysite].RightBorder - Half_Road_Wide[Ysite] - 5;
 		}
 	}
 	// 进环 切外
@@ -2311,7 +2316,7 @@ void Element_Handle_Right_Rings() {
 	    ImageFlag.image_element_rings_flag == 4) {
 		for (int Ysite = 59; Ysite > ImageStatus.OFFLine; Ysite--) {
 			ImageDeal[Ysite].Center =
-			    ImageDeal[Ysite].LeftBorder + Half_Road_Wide[Ysite] - 8;
+			    ImageDeal[Ysite].LeftBorder + Half_Road_Wide[Ysite] + 5;
 			if (ImageDeal[Ysite].Center < 1)
 				ImageDeal[Ysite].Center = 1;
 		}
