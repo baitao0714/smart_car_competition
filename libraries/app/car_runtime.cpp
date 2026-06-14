@@ -142,7 +142,7 @@ bool CarRuntime_ProcessFrame(const cv::Mat& frame, bool enable_motor) {
 bool CarRuntime_RunCameraLoop(
     bool enable_motor, uint16_t width, uint16_t height, uint16_t fps,
     int motor_init_duty, uint32_t empty_frame_delay_us, uint32_t loop_delay_us,
-    bool enable_udp_stream, const char* udp_target_ip, uint16_t udp_target_port,
+    bool enable_udp_stream, const char* udp_target_ip, const char* udp_crop_target_ip, uint16_t udp_target_port,
     int udp_jpeg_quality, uint32_t udp_send_interval_ms) {
 #ifndef LQ_HAVE_OPENCV
 	(void)enable_motor;
@@ -173,9 +173,9 @@ bool CarRuntime_RunCameraLoop(
 
 	if (enable_udp_stream) {
 		// raw camera image target
-		const char* RAW_TARGET_IP = "192.168.31.187";
+		const char* RAW_TARGET_IP = udp_target_ip;
 		// cropped + binarized image target
-		const char* CROP_TARGET_IP = "192.168.31.96";
+		const char* CROP_TARGET_IP = udp_crop_target_ip;
 
 		udp_client_raw.udp_client_init(RAW_TARGET_IP, udp_target_port);
 		udp_ready_raw = (udp_client_raw.get_udp_socket_fd() >= 0);
@@ -279,54 +279,6 @@ bool CarRuntime_RunCameraLoop(
 							    cv::Vec3b(0, 255, 255);
 						}
 
-						// draw ElementDetect ROI mapped from First_image to
-						// bin_vis
-						if (ElementDetect.enable && ElementDetect.red_found &&
-						    !First_image.empty()) {
-							const int cut_width = CropCutWidth;
-							const int cut_height = CropCutHeight;
-							int cut_x =
-							    std::max(0, (First_image.cols - cut_width) / 2);
-							int cut_y = std::max(
-							    0, (First_image.rows - cut_height) / 2);
-							float sx = static_cast<float>(bin_vis.cols) /
-							           static_cast<float>(cut_width);
-							float sy = static_cast<float>(bin_vis.rows) /
-							           static_cast<float>(cut_height);
-
-							int mx = ElementDetect.red_x - cut_x;
-							int my = ElementDetect.red_y - cut_y;
-							int mw = ElementDetect.red_w;
-							int mh = ElementDetect.red_h;
-							int rx = static_cast<int>(std::round(mx * sx));
-							int ry = static_cast<int>(std::round(my * sy));
-							int rw = std::max(
-							    1, static_cast<int>(std::round(mw * sx)));
-							int rh = std::max(
-							    1, static_cast<int>(std::round(mh * sy)));
-							cv::Rect rrect(rx, ry, rw, rh);
-							cv::Rect bound(0, 0, bin_vis.cols, bin_vis.rows);
-							rrect &= bound;
-							if (rrect.area() > 0)
-								cv::rectangle(bin_vis, rrect,
-								              cv::Scalar(0, 0, 255), 1);
-
-							int cx = ElementDetect.roi_x - cut_x;
-							int cy = ElementDetect.roi_y - cut_y;
-							int cw = ElementDetect.roi_w;
-							int ch = ElementDetect.roi_h;
-							int crx = static_cast<int>(std::round(cx * sx));
-							int cry = static_cast<int>(std::round(cy * sy));
-							int crw = std::max(
-							    1, static_cast<int>(std::round(cw * sx)));
-							int crh = std::max(
-							    1, static_cast<int>(std::round(ch * sy)));
-							cv::Rect crect(crx, cry, crw, crh);
-							crect &= bound;
-							if (crect.area() > 0)
-								cv::rectangle(bin_vis, crect,
-								              cv::Scalar(0, 255, 0), 1);
-						}
 
 						cv::resize(bin_vis, bin_vis, cv::Size(160, 120), 0, 0,
 						           cv::INTER_NEAREST);
@@ -378,6 +330,7 @@ bool CarRuntime_RunCameraLoop(
 
 			usleep(loop_delay_us);
 		}
+	}  // close while
 
 		CarRuntime_Shutdown(enable_motor);
 
@@ -385,5 +338,3 @@ bool CarRuntime_RunCameraLoop(
 #endif
 }
 
-// extra closing brace to balance edits
-}

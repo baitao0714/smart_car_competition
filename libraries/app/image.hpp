@@ -236,6 +236,7 @@ extern ImageStatustypedef ImageData;
 
 // Crop config (hot-loadable)
 extern int CropCutWidth;
+extern uint8 Half_Road_Wide[60];
 extern int CropCutHeight;
 
 void LoadCropConfig(const char* path);

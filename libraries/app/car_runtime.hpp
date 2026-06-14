@@ -27,6 +27,7 @@ bool CarRuntime_RunCameraLoop(bool enable_motor = true,
                               uint32_t loop_delay_us = 20 * 1000,
                               bool enable_udp_stream = false,
                               const char *udp_target_ip = "192.168.193.172",
+                              const char *udp_crop_target_ip = "192.168.31.96",
                               uint16_t udp_target_port = 8080,
                               int udp_jpeg_quality = 30,
                               uint32_t udp_send_interval_ms = 33);
