@@ -163,17 +163,37 @@ bool CarRuntime_RunCameraLoop(
 
 	CarRuntime_Init(enable_motor, motor_init_duty);
 
-	lq_udp_client udp_client;
-	bool udp_ready = false;
+	lq_udp_client
+	    udp_client_raw; // send original camera image -> 192.168.31.187
+	lq_udp_client
+	    udp_client_crop; // send cropped & binarized image -> 192.168.31.96
+	bool udp_ready_raw = false;
+	bool udp_ready_crop = false;
 	auto last_udp_send_tp = std::chrono::steady_clock::now();
 
 	if (enable_udp_stream) {
-		udp_client.udp_client_init(udp_target_ip, udp_target_port);
-		udp_ready = (udp_client.get_udp_socket_fd() >= 0);
-		if (!udp_ready) {
-			lq_log_error("UDP stream enabled but init failed");
+		// raw camera image target
+		const char* RAW_TARGET_IP = "192.168.31.187";
+		// cropped + binarized image target
+		const char* CROP_TARGET_IP = "192.168.31.96";
+
+		udp_client_raw.udp_client_init(RAW_TARGET_IP, udp_target_port);
+		udp_ready_raw = (udp_client_raw.get_udp_socket_fd() >= 0);
+		if (!udp_ready_raw) {
+			lq_log_error("UDP raw stream init failed: %s:%u", RAW_TARGET_IP,
+			             udp_target_port);
 		} else {
-			lq_log_info("UDP stream enabled: %s:%u", udp_target_ip,
+			lq_log_info("UDP raw stream enabled: %s:%u", RAW_TARGET_IP,
+			            udp_target_port);
+		}
+
+		udp_client_crop.udp_client_init(CROP_TARGET_IP, udp_target_port);
+		udp_ready_crop = (udp_client_crop.get_udp_socket_fd() >= 0);
+		if (!udp_ready_crop) {
+			lq_log_error("UDP crop stream init failed: %s:%u", CROP_TARGET_IP,
+			             udp_target_port);
+		} else {
+			lq_log_info("UDP crop stream enabled: %s:%u", CROP_TARGET_IP,
 			            udp_target_port);
 		}
 	}
@@ -190,29 +210,180 @@ bool CarRuntime_RunCameraLoop(
 			continue;
 		}
 
-		if (udp_ready) {
+		if (udp_ready_raw || udp_ready_crop) {
 			auto now = std::chrono::steady_clock::now();
 			auto elapsed_ms =
 			    std::chrono::duration_cast<std::chrono::milliseconds>(
 			        now - last_udp_send_tp)
 			        .count();
 			if (elapsed_ms >= (long long)udp_send_interval_ms) {
-				cv::Mat overlay_bgr;
-				if (CarRuntime_BuildGrayOverlayFrame(overlay_bgr)) {
-					if (udp_client.udp_send_image(overlay_bgr,
-					                              udp_jpeg_quality) < 0) {
-						lq_log_error("UDP send overlay image failed");
+				// 1) send raw camera frame to RAW target (with ROI overlay)
+				if (udp_ready_raw) {
+					cv::Mat raw_vis = frame.clone();
+					if (ElementDetect.enable && ElementDetect.red_found) {
+						// marker (red)
+						cv::Rect mrect(ElementDetect.red_x, ElementDetect.red_y,
+						               ElementDetect.red_w,
+						               ElementDetect.red_h);
+						cv::Rect bound_raw(0, 0, raw_vis.cols, raw_vis.rows);
+						mrect &= bound_raw;
+						if (mrect.area() > 0)
+							cv::rectangle(raw_vis, mrect, cv::Scalar(0, 0, 255),
+							              2);
+
+						// classify ROI (green)
+						cv::Rect rrect(ElementDetect.roi_x, ElementDetect.roi_y,
+						               ElementDetect.roi_w,
+						               ElementDetect.roi_h);
+						rrect &= bound_raw;
+						if (rrect.area() > 0)
+							cv::rectangle(raw_vis, rrect, cv::Scalar(0, 255, 0),
+							              2);
+					}
+
+					if (udp_client_raw.udp_send_image(raw_vis,
+					                                  udp_jpeg_quality) < 0) {
+						lq_log_error("UDP send raw image failed");
 					}
 				}
-				last_udp_send_tp = now;
+
+				// 2) send cropped & binarized image to CROP target (showing
+				// line results)
+				if (udp_ready_crop) {
+					cv::Mat bin_vis;
+					// Prefer Gray_image (resized to LCDW x LCDH)
+					if (!Gray_image.empty()) {
+						cv::Mat bin_img;
+						cv::threshold(Gray_image, bin_img, 0, 255,
+						              cv::THRESH_BINARY | cv::THRESH_OTSU);
+						cv::cvtColor(bin_img, bin_vis, cv::COLOR_GRAY2BGR);
+
+						// draw line overlays onto bin_vis using ImageDeal
+						const int rows = bin_vis.rows;
+						const int cols = bin_vis.cols;
+						const int off_line = std::max(
+						    0, std::min((int)ImageStatus.OFFLine, rows - 1));
+						for (int y = rows - 1; y > off_line; --y) {
+							int l = std::max(
+							    0, std::min((int)ImageDeal[y].LeftBorder,
+							                cols - 1));
+							int r = std::max(
+							    0, std::min((int)ImageDeal[y].RightBorder,
+							                cols - 1));
+							int c =
+							    std::max(0, std::min((int)ImageDeal[y].Center,
+							                         cols - 1));
+							bin_vis.at<cv::Vec3b>(y, l) = cv::Vec3b(0, 255, 0);
+							bin_vis.at<cv::Vec3b>(y, r) = cv::Vec3b(0, 0, 255);
+							bin_vis.at<cv::Vec3b>(y, c) =
+							    cv::Vec3b(0, 255, 255);
+						}
+
+						// draw ElementDetect ROI mapped from First_image to
+						// bin_vis
+						if (ElementDetect.enable && ElementDetect.red_found &&
+						    !First_image.empty()) {
+							const int cut_width = CropCutWidth;
+							const int cut_height = CropCutHeight;
+							int cut_x =
+							    std::max(0, (First_image.cols - cut_width) / 2);
+							int cut_y = std::max(
+							    0, (First_image.rows - cut_height) / 2);
+							float sx = static_cast<float>(bin_vis.cols) /
+							           static_cast<float>(cut_width);
+							float sy = static_cast<float>(bin_vis.rows) /
+							           static_cast<float>(cut_height);
+
+							int mx = ElementDetect.red_x - cut_x;
+							int my = ElementDetect.red_y - cut_y;
+							int mw = ElementDetect.red_w;
+							int mh = ElementDetect.red_h;
+							int rx = static_cast<int>(std::round(mx * sx));
+							int ry = static_cast<int>(std::round(my * sy));
+							int rw = std::max(
+							    1, static_cast<int>(std::round(mw * sx)));
+							int rh = std::max(
+							    1, static_cast<int>(std::round(mh * sy)));
+							cv::Rect rrect(rx, ry, rw, rh);
+							cv::Rect bound(0, 0, bin_vis.cols, bin_vis.rows);
+							rrect &= bound;
+							if (rrect.area() > 0)
+								cv::rectangle(bin_vis, rrect,
+								              cv::Scalar(0, 0, 255), 1);
+
+							int cx = ElementDetect.roi_x - cut_x;
+							int cy = ElementDetect.roi_y - cut_y;
+							int cw = ElementDetect.roi_w;
+							int ch = ElementDetect.roi_h;
+							int crx = static_cast<int>(std::round(cx * sx));
+							int cry = static_cast<int>(std::round(cy * sy));
+							int crw = std::max(
+							    1, static_cast<int>(std::round(cw * sx)));
+							int crh = std::max(
+							    1, static_cast<int>(std::round(ch * sy)));
+							cv::Rect crect(crx, cry, crw, crh);
+							crect &= bound;
+							if (crect.area() > 0)
+								cv::rectangle(bin_vis, crect,
+								              cv::Scalar(0, 255, 0), 1);
+						}
+
+						cv::resize(bin_vis, bin_vis, cv::Size(160, 120), 0, 0,
+						           cv::INTER_NEAREST);
+						if (udp_client_crop.udp_send_image(
+						        bin_vis, udp_jpeg_quality) < 0) {
+							lq_log_error("UDP send crop(bin) image failed");
+						}
+					} else if (!Resized_image.empty()) {
+						// fallback: build from Resized_image
+						cv::Mat gray_tmp;
+						cv::cvtColor(Resized_image, gray_tmp,
+						             cv::COLOR_BGR2GRAY);
+						cv::Mat bin_img;
+						cv::threshold(gray_tmp, bin_img, 0, 255,
+						              cv::THRESH_BINARY | cv::THRESH_OTSU);
+						cv::cvtColor(bin_img, bin_vis, cv::COLOR_GRAY2BGR);
+
+						const int rows = bin_vis.rows;
+						const int cols = bin_vis.cols;
+						const int off_line = std::max(
+						    0, std::min((int)ImageStatus.OFFLine, rows - 1));
+						for (int y = rows - 1; y > off_line; --y) {
+							int l = std::max(
+							    0, std::min((int)ImageDeal[y].LeftBorder,
+							                cols - 1));
+							int r = std::max(
+							    0, std::min((int)ImageDeal[y].RightBorder,
+							                cols - 1));
+							int c =
+							    std::max(0, std::min((int)ImageDeal[y].Center,
+							                         cols - 1));
+							bin_vis.at<cv::Vec3b>(y, l) = cv::Vec3b(0, 255, 0);
+							bin_vis.at<cv::Vec3b>(y, r) = cv::Vec3b(0, 0, 255);
+							bin_vis.at<cv::Vec3b>(y, c) =
+							    cv::Vec3b(0, 255, 255);
+						}
+
+						cv::resize(bin_vis, bin_vis, cv::Size(160, 120), 0, 0,
+						           cv::INTER_NEAREST);
+						if (udp_client_crop.udp_send_image(
+						        bin_vis, udp_jpeg_quality) < 0) {
+							lq_log_error("UDP send crop(bin) image failed");
+						}
+					}
+
+					last_udp_send_tp = now;
+				}
 			}
+
+			usleep(loop_delay_us);
 		}
 
-		usleep(loop_delay_us);
-	}
+		CarRuntime_Shutdown(enable_motor);
 
-	CarRuntime_Shutdown(enable_motor);
-
-	return true;
+		return true;
 #endif
+}
+
+// extra closing brace to balance edits
 }
