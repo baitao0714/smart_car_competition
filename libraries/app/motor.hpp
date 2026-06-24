@@ -29,4 +29,8 @@ void Motor_Diff_Pid1(void);
 void Motor_PID_Left(void);
 void Motor_PID_Right(void);
 
+// PID 热加载配置
+void LoadPidConfig(const char* path);
+void PidConfigReloadIfNeeded(const char* path);
+
 #endif

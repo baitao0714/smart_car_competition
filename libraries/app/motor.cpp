@@ -1,11 +1,15 @@
 #include "motor.hpp"
+#include <cstdio>
+#include <fstream>
 #include <memory>
+#include <string>
+#include <sys/stat.h>
 
 namespace {
 constexpr pwm_pin_t kLeftMotorPwmPin = PWM1_PIN65;
 constexpr pwm_pin_t kRightMotorPwmPin = PWM2_PIN66;
-constexpr gpio_pin_t kLeftMotorDirPin = PIN_74;
-constexpr gpio_pin_t kRightMotorDirPin = PIN_75;
+constexpr gpio_pin_t kLeftMotorDirPin = PIN_75;
+constexpr gpio_pin_t kRightMotorDirPin = PIN_74;
 constexpr ls_enc_pwm_pin_t kLeftEncoderPin = ENC_PWM3_PIN67;
 constexpr ls_enc_pwm_pin_t kRightEncoderPin = ENC_PWM0_PIN64;
 constexpr gpio_pin_t kLeftEncoderDirPin = PIN_72;
@@ -81,9 +85,146 @@ int16_t Speed_Expect = 0;
 float Diff_Speed_error = 0;
 int16_t Diff_SpeedL_expect = 0;
 int16_t Diff_SpeedR_expect = 0;
+
 float Diff_Kp = 10.242f; // 10.242
 float Diff_Kd = 20.274f;
 uint8_t stop_flag = 0;
+
+// ========== PID 热加载配置 ==========
+namespace {
+static time_t g_pid_cfg_mtime = 0;
+static const char* kPidConfigPath = "pid.conf";
+
+static const float kDefaultSpeedPL = 6.5f;
+static const float kDefaultSpeedIL = 0.0f;
+static const float kDefaultSpeedDL = 0.0f;
+static const float kDefaultSpeedPR = 6.5f;
+static const float kDefaultSpeedIR = 0.0f;
+static const float kDefaultSpeedDR = 0.0f;
+static const float kDefaultDiffKp = 10.242f;
+static const float kDefaultDiffKd = 20.274f;
+
+static std::string Trim(const std::string& s) {
+	const char* ws = " \t\r\n";
+	auto start = s.find_first_not_of(ws);
+	if (start == std::string::npos)
+		return std::string();
+	auto end = s.find_last_not_of(ws);
+	return s.substr(start, end - start + 1);
+}
+
+void LoadPidConfigImpl(const char* path) {
+	std::ifstream ifs(path);
+	if (!ifs.is_open()) {
+		// 创建默认配置文件
+		std::ofstream ofs(path);
+		if (!ofs.is_open())
+			return;
+		ofs << "# pid.conf - PID hot-load config\n";
+		ofs << "# speed_p_l/speed_i_l/speed_d_l: left motor speed PID\n";
+		ofs << "# speed_p_r/speed_i_r/speed_d_r: right motor speed PID\n";
+		ofs << "# diff_kp/diff_kd: differential PD params\n";
+		ofs << "speed_p_l=6.5\n";
+		ofs << "speed_i_l=0.0\n";
+		ofs << "speed_d_l=0.0\n";
+		ofs << "speed_p_r=6.5\n";
+		ofs << "speed_i_r=0.0\n";
+		ofs << "speed_d_r=0.0\n";
+		ofs << "diff_kp=10.242\n";
+		ofs << "diff_kd=20.274\n";
+		ofs.close();
+		Speed_P_l = kDefaultSpeedPL;
+		Speed_I_l = kDefaultSpeedIL;
+		Speed_D_l = kDefaultSpeedDL;
+		Speed_P_r = kDefaultSpeedPR;
+		Speed_I_r = kDefaultSpeedIR;
+		Speed_D_r = kDefaultSpeedDR;
+		Diff_Kp = kDefaultDiffKp;
+		Diff_Kd = kDefaultDiffKd;
+		return;
+	}
+
+	std::string line;
+	float spl = kDefaultSpeedPL;
+	float sil = kDefaultSpeedIL;
+	float sdl = kDefaultSpeedDL;
+	float spr = kDefaultSpeedPR;
+	float sir = kDefaultSpeedIR;
+	float sdr = kDefaultSpeedDR;
+	float dkp = kDefaultDiffKp;
+	float dkd = kDefaultDiffKd;
+
+	while (std::getline(ifs, line)) {
+		line = Trim(line);
+		if (line.empty() || line[0] == '#')
+			continue;
+		auto pos = line.find('=');
+		if (pos == std::string::npos)
+			continue;
+		auto key = Trim(line.substr(0, pos));
+		auto val = Trim(line.substr(pos + 1));
+		float fv = 0.0f;
+		try {
+			fv = std::stof(val);
+		} catch (...) {
+			continue;
+		}
+		if (key == "speed_p_l")
+			spl = fv;
+		else if (key == "speed_i_l")
+			sil = fv;
+		else if (key == "speed_d_l")
+			sdl = fv;
+		else if (key == "speed_p_r")
+			spr = fv;
+		else if (key == "speed_i_r")
+			sir = fv;
+		else if (key == "speed_d_r")
+			sdr = fv;
+		else if (key == "diff_kp")
+			dkp = fv;
+		else if (key == "diff_kd")
+			dkd = fv;
+	}
+	ifs.close();
+
+	Speed_P_l = spl;
+	Speed_I_l = sil;
+	Speed_D_l = sdl;
+	Speed_P_r = spr;
+	Speed_I_r = sir;
+	Speed_D_r = sdr;
+	Diff_Kp = dkp;
+	Diff_Kd = dkd;
+
+	struct stat st;
+	if (stat(path, &st) == 0)
+		g_pid_cfg_mtime = st.st_mtime;
+	std::printf("Loaded pid config from %s: P_l=%.3f I_l=%.3f D_l=%.3f "
+	            "P_r=%.3f I_r=%.3f D_r=%.3f Kp=%.3f Kd=%.3f\n",
+	            path, Speed_P_l, Speed_I_l, Speed_D_l,
+	            Speed_P_r, Speed_I_r, Speed_D_r,
+	            Diff_Kp, Diff_Kd);
+}
+
+void PidConfigReloadIfNeededImpl(const char* path) {
+	struct stat st;
+	if (stat(path, &st) != 0) {
+		LoadPidConfig(path);
+		return;
+	}
+	if (st.st_mtime != g_pid_cfg_mtime) {
+		LoadPidConfig(path);
+	}
+}
+} // namespace
+
+void LoadPidConfig(const char* path) { LoadPidConfigImpl(path); }
+
+void PidConfigReloadIfNeeded(const char* path) {
+	PidConfigReloadIfNeededImpl(path);
+}
+// ========== PID 热加载配置结束 ==========
 
 float Encoder_Left1(void) {
 	ensure_motor_ready();
@@ -178,16 +319,24 @@ void Motor_Disable1(void) {
 	motor_initialized = false;
 }
 
+// ========== 修改点1：外环降频 ==========
 void Motor_Control(void) {
 	ensure_motor_ready();
 
-	static uint32_t debug_log_divider = 0;
+	// 热加载 PID 参数配置
+	PidConfigReloadIfNeeded(kPidConfigPath);
 
+	static uint32_t debug_log_divider = 0;
+	// [MOD] 外环分频计数器
+	static uint8_t outer_loop_cnt = 0;
+
+	// 读取编码器（内环每次都要用）
 	encoder_Left =
 	    -static_cast<int16_t>(left_motor_encoder->encoder_get_count());
 	encoder_Right =
 	    static_cast<int16_t>(right_motor_encoder->encoder_get_count());
 
+	// 更新目标速度（根据 stop_flag）
 	if (stop_flag == 1) {
 		Speed_Goal_l = 0;
 		Speed_Goal_r = 0;
@@ -204,7 +353,15 @@ void Motor_Control(void) {
 		}
 	}
 
-	Motor_Diff_Pid1();
+	// [MOD] 外环每2次循环执行一次（降频为原来的1/2）
+	outer_loop_cnt++;
+	if (outer_loop_cnt >= 2) {
+		outer_loop_cnt = 0;
+		Motor_Diff_Pid1();   // 执行外环，更新 Diff_SpeedL_expect / Diff_SpeedR_expect
+	}
+	// 如果本次不执行外环，则 Diff_SpeedL_expect / Diff_SpeedR_expect 保持上一次的值
+
+	// 内环每次执行
 	Motor_PID_Left();
 	Motor_PID_Right();
 
@@ -217,16 +374,33 @@ void Motor_Control(void) {
 	}
 }
 
+// ========== 修改点2：左电机速度环加入积分冻结 ==========
 void Motor_PID_Left(void) {
 	ensure_motor_ready();
 
 	Speed_Encoder_l = encoder_Left;
 	Speed_Erro_l = Diff_SpeedL_expect - Speed_Encoder_l;
 
-	Speed_PID_OUT_l += static_cast<int>(
-	    Speed_P_l * (Speed_Erro_l - Speed_Lasterro_l) +
-	    Speed_I_l * Speed_Erro_l +
-	    Speed_D_l * (Speed_Erro_l - 2 * Speed_Lasterro_l + Speed_Preverro_l));
+	// [MOD] 抗积分饱和（积分冻结）
+	bool i_frozen = false;
+	if ((Speed_PID_OUT_l >= PWM_Max && Speed_Erro_l > 0) ||
+	    (Speed_PID_OUT_l <= -PWM_Max && Speed_Erro_l < 0)) {
+		i_frozen = true;
+	}
+
+	if (!i_frozen) {
+		// 正常累加完整 PID（含 I）
+		Speed_PID_OUT_l += static_cast<int>(
+		    Speed_P_l * (Speed_Erro_l - Speed_Lasterro_l) +
+		    Speed_I_l * Speed_Erro_l +
+		    Speed_D_l * (Speed_Erro_l - 2 * Speed_Lasterro_l + Speed_Preverro_l));
+	} else {
+		// 积分冻结：跳过 I 项
+		Speed_PID_OUT_l += static_cast<int>(
+		    Speed_P_l * (Speed_Erro_l - Speed_Lasterro_l) +
+		    0 +  // 跳过积分项
+		    Speed_D_l * (Speed_Erro_l - 2 * Speed_Lasterro_l + Speed_Preverro_l));
+	}
 
 	Speed_PID_OUT_l = clamp_pid_output(Speed_PID_OUT_l, PWM_Min, PWM_Max);
 
@@ -240,16 +414,33 @@ void Motor_PID_Left(void) {
 	}
 }
 
+// ========== 修改点2：右电机速度环加入积分冻结 ==========
 void Motor_PID_Right(void) {
 	ensure_motor_ready();
 
 	Speed_Encoder_r = encoder_Right;
 	Speed_Erro_r = Diff_SpeedR_expect - Speed_Encoder_r;
 
-	Speed_PID_OUT_r += static_cast<int>(
-	    Speed_P_r * (Speed_Erro_r - Speed_Lasterro_r) +
-	    Speed_I_r * Speed_Erro_r +
-	    Speed_D_r * (Speed_Erro_r - 2 * Speed_Lasterro_r + Speed_Preverro_r));
+	// [MOD] 抗积分饱和（积分冻结）
+	bool i_frozen = false;
+	if ((Speed_PID_OUT_r >= PWM_Max && Speed_Erro_r > 0) ||
+	    (Speed_PID_OUT_r <= -PWM_Max && Speed_Erro_r < 0)) {
+		i_frozen = true;
+	}
+
+	if (!i_frozen) {
+		// 正常累加完整 PID（含 I）
+		Speed_PID_OUT_r += static_cast<int>(
+		    Speed_P_r * (Speed_Erro_r - Speed_Lasterro_r) +
+		    Speed_I_r * Speed_Erro_r +
+		    Speed_D_r * (Speed_Erro_r - 2 * Speed_Lasterro_r + Speed_Preverro_r));
+	} else {
+		// 积分冻结：跳过 I 项
+		Speed_PID_OUT_r += static_cast<int>(
+		    Speed_P_r * (Speed_Erro_r - Speed_Lasterro_r) +
+		    0 +  // 跳过积分项
+		    Speed_D_r * (Speed_Erro_r - 2 * Speed_Lasterro_r + Speed_Preverro_r));
+	}
 
 	Speed_PID_OUT_r = clamp_pid_output(Speed_PID_OUT_r, PWM_Min, PWM_Max);
 
