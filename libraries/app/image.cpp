@@ -2040,7 +2040,7 @@ void Element_Handle_Left_Rings() {
 	    ImageFlag.image_element_rings_flag == 4) {
 		for (int Ysite = 57; Ysite > ImageStatus.OFFLine; Ysite--) {
 			ImageDeal[Ysite].Center =
-			    ImageDeal[Ysite].RightBorder - Half_Road_Wide[Ysite] - 5;
+			    ImageDeal[Ysite].RightBorder - Half_Road_Wide[Ysite] - 2;
 		}
 	}
 	// 进环 切外
@@ -2049,7 +2049,7 @@ void Element_Handle_Left_Rings() {
 		int flag_Xsite_1 = 0;
 		int flag_Ysite_1 = 0;
 		float Slope_Rings = 0;
-		for (Ysite = 55; Ysite > ImageStatus.OFFLine; Ysite--) // 寻找A点
+		for (Ysite = 46; Ysite > ImageStatus.OFFLine; Ysite--) // 寻找A点
 		{
 			for (Xsite = ImageDeal[Ysite].LeftBorder + 1;
 			     Xsite < ImageDeal[Ysite].RightBorder - 1; Xsite++) {
@@ -2316,7 +2316,7 @@ void Element_Handle_Right_Rings() {
 	    ImageFlag.image_element_rings_flag == 4) {
 		for (int Ysite = 59; Ysite > ImageStatus.OFFLine; Ysite--) {
 			ImageDeal[Ysite].Center =
-			    ImageDeal[Ysite].LeftBorder + Half_Road_Wide[Ysite] + 5;
+			    ImageDeal[Ysite].LeftBorder + Half_Road_Wide[Ysite] + 2;
 			if (ImageDeal[Ysite].Center < 1)
 				ImageDeal[Ysite].Center = 1;
 		}
@@ -2328,7 +2328,7 @@ void Element_Handle_Right_Rings() {
 		int flag_Xsite_1 = 0;
 		int flag_Ysite_1 = 0;
 		float Slope_Right_Rings = 0;
-		for (Ysite = 55; Ysite > ImageStatus.OFFLine; Ysite--) {
+		for (Ysite = 46; Ysite > ImageStatus.OFFLine; Ysite--) {
 			for (Xsite = ImageDeal[Ysite].LeftBorder + 1;
 			     Xsite < ImageDeal[Ysite].RightBorder - 1; Xsite++) {
 				if (Pixle[Ysite][Xsite] == 1 && Pixle[Ysite][Xsite + 1] == 0) {
