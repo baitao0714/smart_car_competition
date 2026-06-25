@@ -78,8 +78,8 @@ int Speed_PID_OUT_r = 0;
 int Speed_Lasterro_r = 0;
 int Speed_Preverro_r = 0;
 
-int PWM_Max = 4000;
-int PWM_Min = 50; //-5000
+int PWM_Max = 5000;
+int PWM_Min = -5000; //-5000
 int16_t Speed_Begin = 80;
 int16_t Speed_Expect = 0;
 float Diff_Speed_error = 0;
@@ -89,6 +89,8 @@ int16_t Diff_SpeedR_expect = 0;
 float Diff_Kp = 10.242f; // 10.242
 float Diff_Kd = 20.274f;
 uint8_t stop_flag = 0;
+
+int speed_goal = 120;
 
 // ========== PID 热加载配置 ==========
 namespace {
@@ -202,9 +204,8 @@ void LoadPidConfigImpl(const char* path) {
 		g_pid_cfg_mtime = st.st_mtime;
 	std::printf("Loaded pid config from %s: P_l=%.3f I_l=%.3f D_l=%.3f "
 	            "P_r=%.3f I_r=%.3f D_r=%.3f Kp=%.3f Kd=%.3f\n",
-	            path, Speed_P_l, Speed_I_l, Speed_D_l,
-	            Speed_P_r, Speed_I_r, Speed_D_r,
-	            Diff_Kp, Diff_Kd);
+	            path, Speed_P_l, Speed_I_l, Speed_D_l, Speed_P_r, Speed_I_r,
+	            Speed_D_r, Diff_Kp, Diff_Kd);
 }
 
 void PidConfigReloadIfNeededImpl(const char* path) {
@@ -247,8 +248,8 @@ void Encoder_Test1(void) {
 }
 
 void Motor_Argument(void) {
-	Speed_Goal_l = 130;
-	Speed_Goal_r = 130;
+	Speed_Goal_l = speed_goal;
+	Speed_Goal_r = speed_goal;
 
 	Speed_P_l = 6.5f;
 	Speed_I_l = 0; // 1.65f;
@@ -340,26 +341,31 @@ void Motor_Control(void) {
 	if (stop_flag == 1) {
 		Speed_Goal_l = 0;
 		Speed_Goal_r = 0;
+		Motor_Disable1();
 	} else {
-		Speed_Goal_l = 130;
-		Speed_Goal_r = 130;
+		Speed_Goal_l = speed_goal;
+		Speed_Goal_r = speed_goal;
 
 		if (top_point < 15) {
-			Speed_Goal_l = 130;
-			Speed_Goal_r = 130;
+			Speed_Goal_l = speed_goal;
+			Speed_Goal_r = speed_goal;
 		} else {
-			Speed_Goal_l = 130;
-			Speed_Goal_r = 130;
+			Speed_Goal_l = speed_goal;
+			Speed_Goal_r = speed_goal;
 		}
 	}
 
-	// [MOD] 外环每2次循环执行一次（降频为原来的1/2）
-	outer_loop_cnt++;
-	if (outer_loop_cnt >= 2) {
-		outer_loop_cnt = 0;
-		Motor_Diff_Pid1();   // 执行外环，更新 Diff_SpeedL_expect / Diff_SpeedR_expect
-	}
-	// 如果本次不执行外环，则 Diff_SpeedL_expect / Diff_SpeedR_expect 保持上一次的值
+	// // [MOD] 外环每2次循环执行一次（降频为原来的1/2）
+	// outer_loop_cnt++;
+	// if (outer_loop_cnt >= 2) {
+	// 	outer_loop_cnt = 0;
+	// 	Motor_Diff_Pid1(); // 执行外环，更新 Diff_SpeedL_expect /
+	// 	                   // Diff_SpeedR_expect
+	// }
+	// // 如果本次不执行外环，则 Diff_SpeedL_expect / Diff_SpeedR_expect
+	// // 保持上一次的值
+
+	Motor_Diff_Pid1();
 
 	// 内环每次执行
 	Motor_PID_Left();
@@ -381,26 +387,26 @@ void Motor_PID_Left(void) {
 	Speed_Encoder_l = encoder_Left;
 	Speed_Erro_l = Diff_SpeedL_expect - Speed_Encoder_l;
 
-	// [MOD] 抗积分饱和（积分冻结）
-	bool i_frozen = false;
-	if ((Speed_PID_OUT_l >= PWM_Max && Speed_Erro_l > 0) ||
-	    (Speed_PID_OUT_l <= -PWM_Max && Speed_Erro_l < 0)) {
-		i_frozen = true;
-	}
+	// // [MOD] 抗积分饱和（积分冻结）
+	// bool i_frozen = false;
+	// if ((Speed_PID_OUT_l >= PWM_Max && Speed_Erro_l > 0) ||
+	//     (Speed_PID_OUT_l <= -PWM_Max && Speed_Erro_l < 0)) {
+	// 	i_frozen = true;
+	// }
 
-	if (!i_frozen) {
-		// 正常累加完整 PID（含 I）
-		Speed_PID_OUT_l += static_cast<int>(
-		    Speed_P_l * (Speed_Erro_l - Speed_Lasterro_l) +
-		    Speed_I_l * Speed_Erro_l +
-		    Speed_D_l * (Speed_Erro_l - 2 * Speed_Lasterro_l + Speed_Preverro_l));
-	} else {
-		// 积分冻结：跳过 I 项
-		Speed_PID_OUT_l += static_cast<int>(
-		    Speed_P_l * (Speed_Erro_l - Speed_Lasterro_l) +
-		    0 +  // 跳过积分项
-		    Speed_D_l * (Speed_Erro_l - 2 * Speed_Lasterro_l + Speed_Preverro_l));
-	}
+	// if (!i_frozen) {
+	// 正常累加完整 PID（含 I）
+	Speed_PID_OUT_l += static_cast<int>(
+	    Speed_P_l * (Speed_Erro_l - Speed_Lasterro_l) +
+	    Speed_I_l * Speed_Erro_l +
+	    Speed_D_l * (Speed_Erro_l - 2 * Speed_Lasterro_l + Speed_Preverro_l));
+	// } else {
+	// 	// 积分冻结：跳过 I 项
+	// 	Speed_PID_OUT_l += static_cast<int>(
+	// 	    Speed_P_l * (Speed_Erro_l - Speed_Lasterro_l) + 0 + // 跳过积分项
+	// 	    Speed_D_l *
+	// 	        (Speed_Erro_l - 2 * Speed_Lasterro_l + Speed_Preverro_l));
+	// }
 
 	Speed_PID_OUT_l = clamp_pid_output(Speed_PID_OUT_l, PWM_Min, PWM_Max);
 
@@ -421,26 +427,26 @@ void Motor_PID_Right(void) {
 	Speed_Encoder_r = encoder_Right;
 	Speed_Erro_r = Diff_SpeedR_expect - Speed_Encoder_r;
 
-	// [MOD] 抗积分饱和（积分冻结）
-	bool i_frozen = false;
-	if ((Speed_PID_OUT_r >= PWM_Max && Speed_Erro_r > 0) ||
-	    (Speed_PID_OUT_r <= -PWM_Max && Speed_Erro_r < 0)) {
-		i_frozen = true;
-	}
+	// // [MOD] 抗积分饱和（积分冻结）
+	// bool i_frozen = false;
+	// if ((Speed_PID_OUT_r >= PWM_Max && Speed_Erro_r > 0) ||
+	//     (Speed_PID_OUT_r <= -PWM_Max && Speed_Erro_r < 0)) {
+	// 	i_frozen = true;
+	// }
 
-	if (!i_frozen) {
-		// 正常累加完整 PID（含 I）
-		Speed_PID_OUT_r += static_cast<int>(
-		    Speed_P_r * (Speed_Erro_r - Speed_Lasterro_r) +
-		    Speed_I_r * Speed_Erro_r +
-		    Speed_D_r * (Speed_Erro_r - 2 * Speed_Lasterro_r + Speed_Preverro_r));
-	} else {
-		// 积分冻结：跳过 I 项
-		Speed_PID_OUT_r += static_cast<int>(
-		    Speed_P_r * (Speed_Erro_r - Speed_Lasterro_r) +
-		    0 +  // 跳过积分项
-		    Speed_D_r * (Speed_Erro_r - 2 * Speed_Lasterro_r + Speed_Preverro_r));
-	}
+	// if (!i_frozen) {
+	// 正常累加完整 PID（含 I）
+	Speed_PID_OUT_r += static_cast<int>(
+	    Speed_P_r * (Speed_Erro_r - Speed_Lasterro_r) +
+	    Speed_I_r * Speed_Erro_r +
+	    Speed_D_r * (Speed_Erro_r - 2 * Speed_Lasterro_r + Speed_Preverro_r));
+	// } else {
+	// 	// 积分冻结：跳过 I 项
+	// 	Speed_PID_OUT_r += static_cast<int>(
+	// 	    Speed_P_r * (Speed_Erro_r - Speed_Lasterro_r) + 0 + // 跳过积分项
+	// 	    Speed_D_r *
+	// 	        (Speed_Erro_r - 2 * Speed_Lasterro_r + Speed_Preverro_r));
+	// }
 
 	Speed_PID_OUT_r = clamp_pid_output(Speed_PID_OUT_r, PWM_Min, PWM_Max);
 
@@ -486,8 +492,8 @@ void Motor_Diff_Pid1(void) {
 
 	int current_base_speed =
 	    Speed_Goal_l - static_cast<int>(my_abs(turn_error) * 3.5f);
-	if (current_base_speed < 120) {
-		current_base_speed = 120;
+	if (current_base_speed < speed_goal - 10) {
+		current_base_speed = speed_goal - 10;
 	}
 
 	Diff_SpeedL_expect = static_cast<int16_t>(current_base_speed +

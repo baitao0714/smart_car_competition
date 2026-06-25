@@ -273,10 +273,9 @@ bool CarRuntime_RunCameraLoop(
 							int c =
 							    std::max(0, std::min((int)ImageDeal[y].Center,
 							                         cols - 1));
-							bin_vis.at<cv::Vec3b>(y, l) = cv::Vec3b(0, 255, 0);
-							bin_vis.at<cv::Vec3b>(y, r) = cv::Vec3b(0, 0, 255);
-							bin_vis.at<cv::Vec3b>(y, c) =
-							    cv::Vec3b(0, 255, 255);
+							bin_vis.at<cv::Vec3b>(y, l) = (ImageDeal[y].IsLeftFind == 'T') ? cv::Vec3b(0, 255, 0) : cv::Vec3b(255, 0, 0);
+							bin_vis.at<cv::Vec3b>(y, r) = (ImageDeal[y].IsRightFind == 'T') ? cv::Vec3b(0, 0, 255) : cv::Vec3b(255, 0, 0);
+							bin_vis.at<cv::Vec3b>(y, c) = (ImageFlag.image_element_rings == 0) ? cv::Vec3b(0, 255, 255) : cv::Vec3b(255, 0, 0);
 						}
 
 
@@ -310,10 +309,9 @@ bool CarRuntime_RunCameraLoop(
 							int c =
 							    std::max(0, std::min((int)ImageDeal[y].Center,
 							                         cols - 1));
-							bin_vis.at<cv::Vec3b>(y, l) = cv::Vec3b(0, 255, 0);
-							bin_vis.at<cv::Vec3b>(y, r) = cv::Vec3b(0, 0, 255);
-							bin_vis.at<cv::Vec3b>(y, c) =
-							    cv::Vec3b(0, 255, 255);
+							bin_vis.at<cv::Vec3b>(y, l) = (ImageDeal[y].IsLeftFind == 'T') ? cv::Vec3b(0, 255, 0) : cv::Vec3b(255, 0, 0);
+							bin_vis.at<cv::Vec3b>(y, r) = (ImageDeal[y].IsRightFind == 'T') ? cv::Vec3b(0, 0, 255) : cv::Vec3b(255, 0, 0);
+							bin_vis.at<cv::Vec3b>(y, c) = (ImageFlag.image_element_rings == 0) ? cv::Vec3b(0, 255, 255) : cv::Vec3b(255, 0, 0);
 						}
 
 						cv::resize(bin_vis, bin_vis, cv::Size(160, 120), 0, 0,
@@ -330,6 +328,7 @@ bool CarRuntime_RunCameraLoop(
 
 			usleep(loop_delay_us);
 		}
+
 	}  // close while
 
 		CarRuntime_Shutdown(enable_motor);
