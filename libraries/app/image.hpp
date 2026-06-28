@@ -233,6 +233,7 @@ extern ImageDealDatatypedef ImageDeal[LCDH];
 extern ImageFlagtypedef ImageFlag;
 extern ElementDetectDatatypedef ElementDetect;
 extern ImageStatustypedef ImageData;
+extern float Weighting[10];
 
 // Crop config (hot-loadable)
 extern int CropCutWidth;

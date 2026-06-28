@@ -3,6 +3,7 @@
 #include "lq_common.hpp"
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
 #ifdef LQ_HAVE_OPENCV
 #include <opencv2/imgproc.hpp>
 #endif
@@ -84,6 +85,24 @@ static bool CarRuntime_BuildGrayOverlayFrame(cv::Mat& out_bgr) {
 		crect &= bound;
 		if (crect.area() > 0) {
 			cv::rectangle(out_bgr, crect, cv::Scalar(0, 255, 0), 1); // green
+
+			// 叠加检测类别标签
+			const char* cls_label = "detecting...";
+			if (ElementDetect.stable_frames >= ElementDetect.stable_frames_need) {
+				switch (ElementDetect.class_id) {
+				case 0: cls_label = "supplies"; break;
+				case 1: cls_label = "vehicle";  break;
+				case 2: cls_label = "weapon";   break;
+				default: cls_label = "unknown"; break;
+				}
+			}
+			int label_x = crx;
+			int label_y = cry - 6;
+			if (label_y < 10) label_y = cry + crh + 14;
+			cv::putText(out_bgr, cls_label,
+			            cv::Point(label_x, label_y),
+			            cv::FONT_HERSHEY_SIMPLEX, 0.4,
+			            cv::Scalar(0, 255, 0), 1);
 		}
 	}
 
@@ -95,6 +114,105 @@ static bool CarRuntime_BuildGrayOverlayFrame(cv::Mat& out_bgr) {
 bool car_runtime_initialized = false;
 bool car_runtime_motor_enabled = false;
 int car_runtime_motor_init_duty = 1000;
+
+// ====== NCNN 检测绕行状态 ======
+// detour_mode: 0=正常循中线, 1=武器左绕(跟左线), 2=物资右绕(跟右线)
+static int   g_detour_mode = 0;
+static std::chrono::steady_clock::time_point g_detour_start;
+static std::chrono::steady_clock::time_point g_straight_start;
+static int   g_detour_cooldown = 0;     // 冷却帧数，防止重复触发
+static const int   kDetourDurationMs = 1500;  // 绕行持续时间(毫秒)
+static const int   kStraightDurationMs = 1500; // 直行压过持续时间(毫秒)
+static const int   kDetourCooldown = 60; // 绕行结束后的冷却帧数
+
+static void ApplyDetourControl() {
+	auto now = std::chrono::steady_clock::now();
+
+	// 只在非环岛、非特殊路段时工作（绕行激活期间不受此限制）
+	bool detour_active = (g_detour_mode != 0);
+	bool straight_active = (g_straight_start.time_since_epoch().count() > 0);
+	if (!detour_active && !straight_active) {
+		if (ImageStatus.Road_type == LeftCirque ||
+		    ImageStatus.Road_type == RightCirque) {
+			return;
+		}
+	}
+
+	// 冷却递减
+	if (g_detour_cooldown > 0) {
+		g_detour_cooldown--;
+	}
+
+	// 检测到新元素且不在绕行/冷却中
+	if (ElementDetect.route_mode != 0 && !detour_active &&
+	    !straight_active && g_detour_cooldown <= 0) {
+
+		int class_id = ElementDetect.class_id;
+		std::printf("Detour: element class=%d route_mode=%d\n",
+		            class_id, ElementDetect.route_mode);
+
+		if (class_id == 2) {
+			// weapon: 左侧绕行，跟左线
+			g_detour_mode = 1;
+			g_detour_start = now;
+			std::printf("Detour: weapon -> follow LEFT line for %d ms\n",
+			            kDetourDurationMs);
+		} else if (class_id == 0) {
+			// supplies: 右侧绕行，跟右线
+			g_detour_mode = 2;
+			g_detour_start = now;
+			std::printf("Detour: supplies -> follow RIGHT line for %d ms\n",
+			            kDetourDurationMs);
+		} else if (class_id == 1) {
+			// vehicle: 直行压过
+			g_straight_start = now;
+			std::printf("Detour: vehicle -> straight pass for %d ms\n",
+			            kStraightDurationMs);
+		}
+	}
+
+	// 车辆模式：直行，不做中线偏移（正常循中线）
+	if (straight_active) {
+		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+		    now - g_straight_start).count();
+		if (elapsed >= kStraightDurationMs) {
+			g_straight_start = std::chrono::steady_clock::time_point{};
+			g_detour_cooldown = kDetourCooldown;
+			std::printf("Detour: vehicle straight pass finished, cooldown=%d\n",
+			            kDetourCooldown);
+		}
+		return;
+	}
+
+	// 绕行模式：偏离中线
+	if (detour_active) {
+		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+		    now - g_detour_start).count();
+
+		if (elapsed >= kDetourDurationMs) {
+			std::printf("Detour: finished after %lld ms, back to normal, cooldown=%d\n",
+			            (long long)elapsed, kDetourCooldown);
+			g_detour_mode = 0;
+			g_detour_cooldown = kDetourCooldown;
+			ElementDetect.route_mode = 0;
+			ElementDetect.class_id = 0;
+			SystemData.Model = 0;
+		} else {
+			// 绕行期间：不跟线，直接用固定偏差驱动差速，避免被邻道干扰
+			// 偏差方向：左绕→负偏差(左转)，右绕→正偏差(右转)
+			int forced_err = (g_detour_mode == 1) ? -8 : 8;
+			ImageStatus.Det_True = (int)ImageStatus.MiddleLine + forced_err;
+
+			// 每秒打印一次绕行状态
+			static auto last_detour_log = std::chrono::steady_clock::now();
+			if (elapsed > 0 && elapsed % 1000 < 50) {
+				last_detour_log = now;
+				std::printf("Detour[%lldms]: mode=%d forcedErr=%d\n",
+				            (long long)elapsed, g_detour_mode, forced_err);
+			}
+		}
+	}
+}
 } // namespace
 
 void CarRuntime_Init(bool enable_motor, int motor_init_duty) {
@@ -106,6 +224,11 @@ void CarRuntime_Init(bool enable_motor, int motor_init_duty) {
 		Motor_Init1(motor_init_duty);
 		Motor_Argument();
 	}
+
+	g_detour_mode = 0;
+	g_detour_start = std::chrono::steady_clock::time_point{};
+	g_straight_start = std::chrono::steady_clock::time_point{};
+	g_detour_cooldown = 0;
 
 	car_runtime_initialized = true;
 }
@@ -131,6 +254,10 @@ bool CarRuntime_ProcessFrame(const cv::Mat& frame, bool enable_motor) {
 	}
 
 	ImageProcess();
+
+	// 应用 NCNN 检测结果的绕行控制
+	ApplyDetourControl();
+
 	if (enable_motor) {
 		Motor_Control();
 	}
@@ -236,9 +363,28 @@ bool CarRuntime_RunCameraLoop(
 						               ElementDetect.roi_w,
 						               ElementDetect.roi_h);
 						rrect &= bound_raw;
-						if (rrect.area() > 0)
+						if (rrect.area() > 0) {
 							cv::rectangle(raw_vis, rrect, cv::Scalar(0, 255, 0),
 							              2);
+
+							// 叠加检测类别标签
+							const char* cls_label = "detecting...";
+							if (ElementDetect.stable_frames >= ElementDetect.stable_frames_need) {
+								switch (ElementDetect.class_id) {
+								case 0: cls_label = "supplies"; break;
+								case 1: cls_label = "vehicle";  break;
+								case 2: cls_label = "weapon";   break;
+								default: cls_label = "unknown"; break;
+								}
+							}
+							int label_x = rrect.x;
+							int label_y = rrect.y - 8;
+							if (label_y < 12) label_y = rrect.y + rrect.height + 16;
+							cv::putText(raw_vis, cls_label,
+							            cv::Point(label_x, label_y),
+							            cv::FONT_HERSHEY_SIMPLEX, 0.5,
+							            cv::Scalar(0, 255, 0), 2);
+						}
 					}
 
 					if (udp_client_raw.udp_send_image(raw_vis,

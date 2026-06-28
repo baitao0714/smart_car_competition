@@ -14,6 +14,10 @@
 #ifdef LQ_HAVE_OPENCV
 #include <opencv2/imgproc.hpp>
 
+#ifdef LQ_HAVE_NCNN
+#include "lq_ncnn.hpp"
+#endif
+
 //*****************************************全局变量声明
 
 cv::Mat First_image;
@@ -22,6 +26,32 @@ cv::Mat Resized_image;
 cv::Mat Gray_image;
 cv::Mat Bin_Frame;
 cv::Mat Element_image;
+
+#ifdef LQ_HAVE_NCNN
+#include "lq_ncnn.hpp"
+static LQ_NCNN* g_ncnn_classifier = nullptr;
+static bool g_ncnn_ready = false;
+
+static void EnsureNcnnReady() {
+	if (g_ncnn_ready) return;
+	if (!g_ncnn_classifier) {
+		g_ncnn_classifier = new LQ_NCNN();
+		g_ncnn_classifier->SetModelPath("tiny_classifier_fp32.ncnn.param",
+		                                "tiny_classifier_fp32.ncnn.bin");
+		g_ncnn_classifier->SetInputSize(96, 96);
+		g_ncnn_classifier->SetLabels({"supplies", "vehicle", "weapon"});
+		float mean_vals[3] = {123.675f, 116.28f, 103.53f};
+		float norm_vals[3] = {0.01712475f, 0.017507f, 0.01742919f};
+		g_ncnn_classifier->SetNormalize(mean_vals, norm_vals);
+	}
+	if (g_ncnn_classifier->Init()) {
+		g_ncnn_ready = true;
+		std::printf("NCNN classifier initialized successfully\n");
+	} else {
+		std::printf("NCNN classifier init failed, will retry\n");
+	}
+}
+#endif
 #endif
 
 int ImageScanInterval;       // 扫描范围   当前行的边界+-ImageScanInterval
@@ -333,8 +363,7 @@ static bool DetectRedMarker(const cv::Mat& frame, cv::Rect& marker_rect,
 	cv::inRange(hsv, cv::Scalar(h2_min, s_min, v_min),
 	            cv::Scalar(h2_max, 255, 255), mask2);
 	cv::bitwise_or(mask1, mask2, red_mask);
-	cv::morphologyEx(red_mask, red_mask, cv::MORPH_CLOSE,
-	                 cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
+	// 只用开运算去除噪点，不做闭运算（避免把上下两个红色块连成一片）
 	cv::morphologyEx(red_mask, red_mask, cv::MORPH_OPEN,
 	                 cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
 
@@ -342,7 +371,7 @@ static bool DetectRedMarker(const cv::Mat& frame, cv::Rect& marker_rect,
 	cv::findContours(red_mask, contours, cv::RETR_EXTERNAL,
 	                 cv::CHAIN_APPROX_SIMPLE);
 
-	double best_area = 0.0;
+	double best_y = -1.0;   // 找最下方的红色块（y 最大 = 最靠图像底部）
 	marker_rect = cv::Rect();
 	for (const auto& contour : contours) {
 		const double area = cv::contourArea(contour);
@@ -357,12 +386,17 @@ static bool DetectRedMarker(const cv::Mat& frame, cv::Rect& marker_rect,
 
 		const float aspect =
 		    static_cast<float>(rect.width) / static_cast<float>(rect.height);
-		if (aspect < 0.2f || aspect > 20.0f) {
+		if (aspect < 1.5f || aspect > 20.0f) {
 			continue;
 		}
 
-		if (area > best_area) {
-			best_area = area;
+		// 取最下方的红色块（y + height 最大，即最靠近图像底部），
+		// 如多个块底部 y 相同，取面积更大的
+		int bottom_y = rect.y + rect.height;
+		if (bottom_y > best_y) {
+			best_y = bottom_y;
+			marker_rect = rect;
+		} else if (bottom_y == static_cast<int>(best_y) && area > static_cast<double>(marker_rect.area())) {
 			marker_rect = rect;
 		}
 	}
@@ -371,8 +405,10 @@ static bool DetectRedMarker(const cv::Mat& frame, cv::Rect& marker_rect,
 		return false;
 	}
 
-	red_fill_ratio =
-	    static_cast<float>(best_area) / static_cast<float>(marker_rect.area());
+	// 计算红色填充率：marker_rect 区域内红色像素占比
+	cv::Mat roi_mask = red_mask(marker_rect);
+	red_fill_ratio = static_cast<float>(cv::countNonZero(roi_mask)) /
+	                 static_cast<float>(marker_rect.area());
 	return true;
 }
 
@@ -384,16 +420,19 @@ static cv::Rect BuildClassifyRoi(const cv::Rect& marker_rect,
 
 	const int roi_width = std::max(
 	    1, marker_rect.width * ElementDetect.roi_width_scale_percent / 100);
-	const int roi_height = std::max(
+	const int roi_height_above = std::max(
 	    1, marker_rect.height * ElementDetect.roi_height_scale_percent / 100);
 	const int center_x = marker_rect.x + marker_rect.width / 2;
 	const int roi_x =
 	    center_x - roi_width / 2 + ElementDetect.roi_x_offset_pixels;
-	const int roi_y = marker_rect.y - roi_height -
+	const int roi_y = marker_rect.y - roi_height_above -
 	                  ElementDetect.roi_gap_pixels +
 	                  ElementDetect.roi_y_offset_pixels;
 
-	return ClampRect(cv::Rect(roi_x, roi_y, roi_width, roi_height), frame_size);
+	// 扩展 ROI 使其同时包含上方的分类区域和下方的红色矩形
+	const int roi_total_height = roi_height_above + ElementDetect.roi_gap_pixels + marker_rect.height;
+
+	return ClampRect(cv::Rect(roi_x, roi_y, roi_width, roi_total_height), frame_size);
 }
 
 static int ClassifyElementPatch(const cv::Mat& patch) {
@@ -401,6 +440,23 @@ static int ClassifyElementPatch(const cv::Mat& patch) {
 		return 0;
 	}
 
+#ifdef LQ_HAVE_NCNN
+	EnsureNcnnReady();
+	if (g_ncnn_ready && g_ncnn_classifier) {
+		try {
+			std::string result = g_ncnn_classifier->Infer(patch);
+			if (result == "supplies") return 0;
+			if (result == "vehicle")  return 1;
+			if (result == "weapon")   return 2;
+			std::printf("NCNN classify: unknown label '%s', fallback to 0\n", result.c_str());
+			return 0;
+		} catch (const std::exception& e) {
+			std::printf("NCNN classify error: %s, fallback to heuristics\n", e.what());
+		}
+	}
+#endif
+
+	// Fallback: heuristic classification when NCNN unavailable
 	cv::Mat gray;
 	if (patch.channels() == 3) {
 		cv::cvtColor(patch, gray, cv::COLOR_BGR2GRAY);
@@ -445,13 +501,13 @@ static int ClassifyElementPatch(const cv::Mat& patch) {
 	                           static_cast<float>(total_pixels);
 
 	if (white_ratio > 0.82f && edge_density < 0.05f) {
-		return 0; // 物资
+		return 0; // supplies
 	}
 	if (aspect_ratio > 1.20f && edge_density > 0.06f) {
-		return 1; // 交通工具
+		return 1; // vehicle
 	}
 	if (aspect_ratio < 0.90f || edge_density > 0.10f) {
-		return 2; // 武器
+		return 2; // weapon
 	}
 	return 0;
 }
