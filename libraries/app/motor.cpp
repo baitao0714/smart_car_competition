@@ -343,13 +343,8 @@ void Motor_Control(void) {
 		Speed_Goal_r = 0;
 		Motor_Disable1();
 	} else {
-		Speed_Goal_l = speed_goal;
-		Speed_Goal_r = speed_goal;
-
-		if (top_point < 15) {
-			Speed_Goal_l = speed_goal;
-			Speed_Goal_r = speed_goal;
-		} else {
+		// 非环岛时用默认速度，环岛内保持 Element_Handle 已设的值
+		if (ImageFlag.image_element_rings == 0) {
 			Speed_Goal_l = speed_goal;
 			Speed_Goal_r = speed_goal;
 		}
@@ -374,9 +369,10 @@ void Motor_Control(void) {
 	if (++debug_log_divider >= 30) {
 		debug_log_divider = 0;
 		const int center_error = ImageStatus.Det_True - ImageStatus.MiddleLine;
-		printf("err=%4d  pidL=%6d  pidR=%6d  spdL=%4d  spdR=%4d\n",
+		printf("err=%4d  pidL=%6d  pidR=%6d  spdL=%4d  spdR=%4d  "
+		       "speed_goal_l=%d  speed_goal_r=%d\n",
 		       center_error, Speed_PID_OUT_l, Speed_PID_OUT_r, encoder_Left,
-		       encoder_Right);
+		       encoder_Right, Speed_Goal_l, Speed_Goal_r);
 	}
 }
 
@@ -492,9 +488,9 @@ void Motor_Diff_Pid1(void) {
 
 	int current_base_speed =
 	    Speed_Goal_l - static_cast<int>(my_abs(turn_error) * 3.5f);
-	if (current_base_speed < speed_goal - 10) {
-		current_base_speed = speed_goal - 10;
-	}
+	// if (current_base_speed < speed_goal - 10) {
+	// 	current_base_speed = speed_goal - 10;
+	// }
 
 	Diff_SpeedL_expect = static_cast<int16_t>(current_base_speed +
 	                                          static_cast<int>(turn_output));

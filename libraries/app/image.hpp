@@ -256,3 +256,7 @@ void ElementConfigReloadIfNeeded(const char* path);
 #endif
 extern uint8_t stop_flag;
 extern float Diff_Kp;
+extern float Speed_P_l;
+extern float Speed_P_r;
+extern int Speed_Goal_l;
+extern int Speed_Goal_r;

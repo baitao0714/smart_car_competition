@@ -88,21 +88,30 @@ static bool CarRuntime_BuildGrayOverlayFrame(cv::Mat& out_bgr) {
 
 			// 叠加检测类别标签
 			const char* cls_label = "detecting...";
-			if (ElementDetect.stable_frames >= ElementDetect.stable_frames_need) {
+			if (ElementDetect.stable_frames >=
+			    ElementDetect.stable_frames_need) {
 				switch (ElementDetect.class_id) {
-				case 0: cls_label = "supplies"; break;
-				case 1: cls_label = "vehicle";  break;
-				case 2: cls_label = "weapon";   break;
-				default: cls_label = "unknown"; break;
+				case 0:
+					cls_label = "supplies";
+					break;
+				case 1:
+					cls_label = "vehicle";
+					break;
+				case 2:
+					cls_label = "weapon";
+					break;
+				default:
+					cls_label = "unknown";
+					break;
 				}
 			}
 			int label_x = crx;
 			int label_y = cry - 6;
-			if (label_y < 10) label_y = cry + crh + 14;
-			cv::putText(out_bgr, cls_label,
-			            cv::Point(label_x, label_y),
-			            cv::FONT_HERSHEY_SIMPLEX, 0.4,
-			            cv::Scalar(0, 255, 0), 1);
+			if (label_y < 10)
+				label_y = cry + crh + 14;
+			cv::putText(out_bgr, cls_label, cv::Point(label_x, label_y),
+			            cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(0, 255, 0),
+			            1);
 		}
 	}
 
@@ -117,13 +126,13 @@ int car_runtime_motor_init_duty = 1000;
 
 // ====== NCNN 检测绕行状态 ======
 // detour_mode: 0=正常循中线, 1=武器左绕(跟左线), 2=物资右绕(跟右线)
-static int   g_detour_mode = 0;
+static int g_detour_mode = 0;
 static std::chrono::steady_clock::time_point g_detour_start;
 static std::chrono::steady_clock::time_point g_straight_start;
-static int   g_detour_cooldown = 0;     // 冷却帧数，防止重复触发
-static const int   kDetourDurationMs = 1500;  // 绕行持续时间(毫秒)
-static const int   kStraightDurationMs = 1500; // 直行压过持续时间(毫秒)
-static const int   kDetourCooldown = 60; // 绕行结束后的冷却帧数
+static int g_detour_cooldown = 0;            // 冷却帧数，防止重复触发
+static const int kDetourDurationMs = 1000;   // 绕行持续时间(毫秒)
+static const int kStraightDurationMs = 1000; // 直行压过持续时间(毫秒)
+static const int kDetourCooldown = 60;       // 绕行结束后的冷却帧数
 
 static void ApplyDetourControl() {
 	auto now = std::chrono::steady_clock::now();
@@ -144,12 +153,12 @@ static void ApplyDetourControl() {
 	}
 
 	// 检测到新元素且不在绕行/冷却中
-	if (ElementDetect.route_mode != 0 && !detour_active &&
-	    !straight_active && g_detour_cooldown <= 0) {
+	if (ElementDetect.route_mode != 0 && !detour_active && !straight_active &&
+	    g_detour_cooldown <= 0) {
 
 		int class_id = ElementDetect.class_id;
-		std::printf("Detour: element class=%d route_mode=%d\n",
-		            class_id, ElementDetect.route_mode);
+		std::printf("Detour: element class=%d route_mode=%d\n", class_id,
+		            ElementDetect.route_mode);
 
 		if (class_id == 2) {
 			// weapon: 左侧绕行，跟左线
@@ -174,7 +183,8 @@ static void ApplyDetourControl() {
 	// 车辆模式：直行，不做中线偏移（正常循中线）
 	if (straight_active) {
 		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-		    now - g_straight_start).count();
+		                   now - g_straight_start)
+		                   .count();
 		if (elapsed >= kStraightDurationMs) {
 			g_straight_start = std::chrono::steady_clock::time_point{};
 			g_detour_cooldown = kDetourCooldown;
@@ -187,11 +197,13 @@ static void ApplyDetourControl() {
 	// 绕行模式：偏离中线
 	if (detour_active) {
 		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-		    now - g_detour_start).count();
+		                   now - g_detour_start)
+		                   .count();
 
 		if (elapsed >= kDetourDurationMs) {
-			std::printf("Detour: finished after %lld ms, back to normal, cooldown=%d\n",
-			            (long long)elapsed, kDetourCooldown);
+			std::printf(
+			    "Detour: finished after %lld ms, back to normal, cooldown=%d\n",
+			    (long long)elapsed, kDetourCooldown);
 			g_detour_mode = 0;
 			g_detour_cooldown = kDetourCooldown;
 			ElementDetect.route_mode = 0;
@@ -269,7 +281,8 @@ bool CarRuntime_ProcessFrame(const cv::Mat& frame, bool enable_motor) {
 bool CarRuntime_RunCameraLoop(
     bool enable_motor, uint16_t width, uint16_t height, uint16_t fps,
     int motor_init_duty, uint32_t empty_frame_delay_us, uint32_t loop_delay_us,
-    bool enable_udp_stream, const char* udp_target_ip, const char* udp_crop_target_ip, uint16_t udp_target_port,
+    bool enable_udp_stream, const char* udp_target_ip,
+    const char* udp_crop_target_ip, uint16_t udp_target_port,
     int udp_jpeg_quality, uint32_t udp_send_interval_ms) {
 #ifndef LQ_HAVE_OPENCV
 	(void)enable_motor;
@@ -305,7 +318,7 @@ bool CarRuntime_RunCameraLoop(
 		const char* CROP_TARGET_IP = udp_crop_target_ip;
 
 		udp_client_raw.udp_client_init(RAW_TARGET_IP, udp_target_port);
-		udp_ready_raw = (udp_client_raw.get_udp_socket_fd() >= 0);
+		udp_ready_raw = false; // disabled
 		if (!udp_ready_raw) {
 			lq_log_error("UDP raw stream init failed: %s:%u", RAW_TARGET_IP,
 			             udp_target_port);
@@ -369,17 +382,27 @@ bool CarRuntime_RunCameraLoop(
 
 							// 叠加检测类别标签
 							const char* cls_label = "detecting...";
-							if (ElementDetect.stable_frames >= ElementDetect.stable_frames_need) {
+							if (ElementDetect.stable_frames >=
+							    ElementDetect.stable_frames_need) {
 								switch (ElementDetect.class_id) {
-								case 0: cls_label = "supplies"; break;
-								case 1: cls_label = "vehicle";  break;
-								case 2: cls_label = "weapon";   break;
-								default: cls_label = "unknown"; break;
+								case 0:
+									cls_label = "supplies";
+									break;
+								case 1:
+									cls_label = "vehicle";
+									break;
+								case 2:
+									cls_label = "weapon";
+									break;
+								default:
+									cls_label = "unknown";
+									break;
 								}
 							}
 							int label_x = rrect.x;
 							int label_y = rrect.y - 8;
-							if (label_y < 12) label_y = rrect.y + rrect.height + 16;
+							if (label_y < 12)
+								label_y = rrect.y + rrect.height + 16;
 							cv::putText(raw_vis, cls_label,
 							            cv::Point(label_x, label_y),
 							            cv::FONT_HERSHEY_SIMPLEX, 0.5,
@@ -419,11 +442,19 @@ bool CarRuntime_RunCameraLoop(
 							int c =
 							    std::max(0, std::min((int)ImageDeal[y].Center,
 							                         cols - 1));
-							bin_vis.at<cv::Vec3b>(y, l) = (ImageDeal[y].IsLeftFind == 'T') ? cv::Vec3b(0, 255, 0) : cv::Vec3b(255, 0, 0);
-							bin_vis.at<cv::Vec3b>(y, r) = (ImageDeal[y].IsRightFind == 'T') ? cv::Vec3b(0, 0, 255) : cv::Vec3b(255, 0, 0);
-							bin_vis.at<cv::Vec3b>(y, c) = (ImageFlag.image_element_rings == 0) ? cv::Vec3b(0, 255, 255) : cv::Vec3b(255, 0, 0);
+							bin_vis.at<cv::Vec3b>(y, l) =
+							    (ImageDeal[y].IsLeftFind == 'T')
+							        ? cv::Vec3b(0, 255, 0)
+							        : cv::Vec3b(255, 0, 0);
+							bin_vis.at<cv::Vec3b>(y, r) =
+							    (ImageDeal[y].IsRightFind == 'T')
+							        ? cv::Vec3b(0, 0, 255)
+							        : cv::Vec3b(255, 0, 0);
+							bin_vis.at<cv::Vec3b>(y, c) =
+							    (ImageFlag.image_element_rings == 0)
+							        ? cv::Vec3b(0, 255, 255)
+							        : cv::Vec3b(255, 0, 0);
 						}
-
 
 						cv::resize(bin_vis, bin_vis, cv::Size(160, 120), 0, 0,
 						           cv::INTER_NEAREST);
@@ -455,9 +486,18 @@ bool CarRuntime_RunCameraLoop(
 							int c =
 							    std::max(0, std::min((int)ImageDeal[y].Center,
 							                         cols - 1));
-							bin_vis.at<cv::Vec3b>(y, l) = (ImageDeal[y].IsLeftFind == 'T') ? cv::Vec3b(0, 255, 0) : cv::Vec3b(255, 0, 0);
-							bin_vis.at<cv::Vec3b>(y, r) = (ImageDeal[y].IsRightFind == 'T') ? cv::Vec3b(0, 0, 255) : cv::Vec3b(255, 0, 0);
-							bin_vis.at<cv::Vec3b>(y, c) = (ImageFlag.image_element_rings == 0) ? cv::Vec3b(0, 255, 255) : cv::Vec3b(255, 0, 0);
+							bin_vis.at<cv::Vec3b>(y, l) =
+							    (ImageDeal[y].IsLeftFind == 'T')
+							        ? cv::Vec3b(0, 255, 0)
+							        : cv::Vec3b(255, 0, 0);
+							bin_vis.at<cv::Vec3b>(y, r) =
+							    (ImageDeal[y].IsRightFind == 'T')
+							        ? cv::Vec3b(0, 0, 255)
+							        : cv::Vec3b(255, 0, 0);
+							bin_vis.at<cv::Vec3b>(y, c) =
+							    (ImageFlag.image_element_rings == 0)
+							        ? cv::Vec3b(0, 255, 255)
+							        : cv::Vec3b(255, 0, 0);
 						}
 
 						cv::resize(bin_vis, bin_vis, cv::Size(160, 120), 0, 0,
@@ -475,11 +515,10 @@ bool CarRuntime_RunCameraLoop(
 			usleep(loop_delay_us);
 		}
 
-	}  // close while
+	} // close while
 
-		CarRuntime_Shutdown(enable_motor);
+	CarRuntime_Shutdown(enable_motor);
 
-		return true;
+	return true;
 #endif
 }
-

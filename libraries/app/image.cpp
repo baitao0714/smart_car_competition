@@ -33,7 +33,8 @@ static LQ_NCNN* g_ncnn_classifier = nullptr;
 static bool g_ncnn_ready = false;
 
 static void EnsureNcnnReady() {
-	if (g_ncnn_ready) return;
+	if (g_ncnn_ready)
+		return;
 	if (!g_ncnn_classifier) {
 		g_ncnn_classifier = new LQ_NCNN();
 		g_ncnn_classifier->SetModelPath("tiny_classifier_fp32.ncnn.param",
@@ -89,7 +90,9 @@ int Point_Xsite, Point_Ysite;               // 顶点坐标
 int Repair_Point_Xsite, Repair_Point_Ysite; // 修复点坐标
 uint8_t* binar;                             // 灰度图像数组指针
 
-float Diff_delta = 2.5f; // 圆环差速P增量
+float Diff_delta = 2.5f;   // 圆环差速P增量
+float speed_delta = 1.0f;  // 圆环速度p减小量
+int speed_goal_delta = 10; // 圆环目标速度减小量
 
 // uint8 Half_Road_Wide[60] = // 直道半宽度
 //     {
@@ -371,7 +374,7 @@ static bool DetectRedMarker(const cv::Mat& frame, cv::Rect& marker_rect,
 	cv::findContours(red_mask, contours, cv::RETR_EXTERNAL,
 	                 cv::CHAIN_APPROX_SIMPLE);
 
-	double best_y = -1.0;   // 找最下方的红色块（y 最大 = 最靠图像底部）
+	double best_y = -1.0; // 找最下方的红色块（y 最大 = 最靠图像底部）
 	marker_rect = cv::Rect();
 	for (const auto& contour : contours) {
 		const double area = cv::contourArea(contour);
@@ -396,7 +399,8 @@ static bool DetectRedMarker(const cv::Mat& frame, cv::Rect& marker_rect,
 		if (bottom_y > best_y) {
 			best_y = bottom_y;
 			marker_rect = rect;
-		} else if (bottom_y == static_cast<int>(best_y) && area > static_cast<double>(marker_rect.area())) {
+		} else if (bottom_y == static_cast<int>(best_y) &&
+		           area > static_cast<double>(marker_rect.area())) {
 			marker_rect = rect;
 		}
 	}
@@ -430,9 +434,11 @@ static cv::Rect BuildClassifyRoi(const cv::Rect& marker_rect,
 	                  ElementDetect.roi_y_offset_pixels;
 
 	// 扩展 ROI 使其同时包含上方的分类区域和下方的红色矩形
-	const int roi_total_height = roi_height_above + ElementDetect.roi_gap_pixels + marker_rect.height;
+	const int roi_total_height =
+	    roi_height_above + ElementDetect.roi_gap_pixels + marker_rect.height;
 
-	return ClampRect(cv::Rect(roi_x, roi_y, roi_width, roi_total_height), frame_size);
+	return ClampRect(cv::Rect(roi_x, roi_y, roi_width, roi_total_height),
+	                 frame_size);
 }
 
 static int ClassifyElementPatch(const cv::Mat& patch) {
@@ -445,13 +451,18 @@ static int ClassifyElementPatch(const cv::Mat& patch) {
 	if (g_ncnn_ready && g_ncnn_classifier) {
 		try {
 			std::string result = g_ncnn_classifier->Infer(patch);
-			if (result == "supplies") return 0;
-			if (result == "vehicle")  return 1;
-			if (result == "weapon")   return 2;
-			std::printf("NCNN classify: unknown label '%s', fallback to 0\n", result.c_str());
+			if (result == "supplies")
+				return 0;
+			if (result == "vehicle")
+				return 1;
+			if (result == "weapon")
+				return 2;
+			std::printf("NCNN classify: unknown label '%s', fallback to 0\n",
+			            result.c_str());
 			return 0;
 		} catch (const std::exception& e) {
-			std::printf("NCNN classify error: %s, fallback to heuristics\n", e.what());
+			std::printf("NCNN classify error: %s, fallback to heuristics\n",
+			            e.what());
 		}
 	}
 #endif
@@ -1794,7 +1805,7 @@ void Element_Judgment_Left_Rings() {
 	    || ImageDeal[55].IsLeftFind == 'W' || ImageDeal[56].IsLeftFind == 'W' ||
 	    ImageDeal[57].IsLeftFind == 'W' || ImageDeal[58].IsLeftFind == 'W' ||
 	    (ImageDeal[42].RightBorder - ImageDeal[42].LeftBorder) <
-	        40) // U型弯底部赛道窄
+	        43) // U型弯底部赛道窄
 		return;
 	int ring_ysite = 25;
 	//  uint8 Left_Less_Num = 0;
@@ -1848,6 +1859,10 @@ void Element_Judgment_Left_Rings() {
 		ImageFlag.image_element_rings_flag = 1;
 		ImageFlag.ring_big_small = 1;
 		Diff_Kp += Diff_delta; // 环岛内增大差速P
+		Speed_P_l -= speed_delta;
+		Speed_P_r -= speed_delta;
+		Speed_Goal_l -= speed_goal_delta;
+		Speed_Goal_r -= speed_goal_delta;
 
 		ImageStatus.Road_type = LeftCirque;
 		std::printf("LeftRing detect: P1=%d P2=%d rings=%d flag=%d\n",
@@ -1882,7 +1897,7 @@ void Element_Judgment_Right_Rings() {
 	    ImageDeal[54].IsRightFind == 'W' || ImageDeal[55].IsRightFind == 'W' ||
 	    ImageDeal[56].IsRightFind == 'W' || ImageDeal[57].IsRightFind == 'W' ||
 	    ImageDeal[58].IsRightFind == 'W' ||
-	    (ImageDeal[42].RightBorder - ImageDeal[42].LeftBorder) < 40) {
+	    (ImageDeal[42].RightBorder - ImageDeal[42].LeftBorder) < 43) {
 		return;
 	}
 	int ring_ysite = 25;
@@ -1938,6 +1953,10 @@ void Element_Judgment_Right_Rings() {
 		ImageFlag.image_element_rings_flag = 1;
 		ImageFlag.ring_big_small = 1; // 大环
 		Diff_Kp += Diff_delta;        // 环岛内增大差速P
+		Speed_P_l -= speed_delta;
+		Speed_P_r -= speed_delta; // 减小速度P
+		Speed_Goal_l -= speed_goal_delta;
+		Speed_Goal_r -= speed_goal_delta;
 		SystemData.Stop = 1;
 		ImageStatus.Road_type = RightCirque;
 		std::printf("RightRing detect: P1=%d P2=%d rings=%d flag=%d\n",
@@ -2089,10 +2108,14 @@ void Element_Handle_Left_Rings() {
 			ImageFlag.image_element_rings_flag = 0;
 			ImageFlag.image_element_rings = 0;
 			ImageFlag.ring_big_small = 0;
-			Diff_Kp -= Diff_delta; // 出环岛恢复差速P
-			                       // ImageStatus.Road_type = Normol;
-			                       // wireless_uart_send_byte(0);
-			                       //                gpio_set_level(Beep, 0);
+			Diff_Kp -= Diff_delta;
+			Speed_P_l += speed_delta;
+			Speed_P_r += speed_delta;
+			Speed_Goal_l += speed_goal_delta;
+			Speed_Goal_r += speed_goal_delta;
+			// ImageStatus.Road_type = Normol;
+			// wireless_uart_send_byte(0);
+			//                gpio_set_level(Beep, 0);
 		}
 	}
 
@@ -2365,10 +2388,14 @@ void Element_Handle_Right_Rings() {
 			ImageFlag.image_element_rings_flag = 0;
 			ImageFlag.image_element_rings = 0;
 			ImageFlag.ring_big_small = 0;
-			Diff_Kp -= Diff_delta; // 出环岛恢复差速P
-			                       // ImageStatus.Road_type = Normol;
-			                       //            Front_Ring_Continue_Count++;
-			                       //            gpio_set_level(Beep, 0);
+			Diff_Kp -= Diff_delta;
+			Speed_P_l += speed_delta;
+			Speed_P_r += speed_delta;
+			Speed_Goal_l += speed_goal_delta;
+			Speed_Goal_r += speed_goal_delta;
+			// ImageStatus.Road_type = Normol;
+			//            Front_Ring_Continue_Count++;
+			//            gpio_set_level(Beep, 0);
 		}
 	}
 	/***************************************控制**************************************/
@@ -2708,7 +2735,7 @@ static void Zebra_Detect(void) {
 		}
 		total_jumps += jumps;
 	}
-	if (total_jumps > 10) {
+	if (total_jumps > 70) {
 		stop_flag = 1;
 		printf("ZEBRA: stop! jumps=%d\n", total_jumps);
 	}
@@ -2784,13 +2811,17 @@ void ImageProcess(void) {
 		    RoadTypeToString(ImageStatus.Road_type),
 		    static_cast<unsigned int>(ImageFlag.image_element_rings_flag),
 		    static_cast<unsigned int>(Ring_Help_Flag));
-		std::printf(
-		    "ElementDetect: marker=(%d,%d,%d,%d) roi=(%d,%d,%d,%d) white=%d%% "
-		    "class=%s\n",
-		    ElementDetect.red_x, ElementDetect.red_y, ElementDetect.red_w,
-		    ElementDetect.red_h, ElementDetect.roi_x, ElementDetect.roi_y,
-		    ElementDetect.roi_w, ElementDetect.roi_h, ElementDetect.white_ratio,
-		    ElementClassName(ElementDetect.class_id));
+		if (ElementDetect.red_found) {
+			std::printf("ElementDetect: marker=(%d,%d,%d,%d) roi=(%d,%d,%d,%d) "
+			            "white=%d%% "
+			            "class=%s\n",
+			            ElementDetect.red_x, ElementDetect.red_y,
+			            ElementDetect.red_w, ElementDetect.red_h,
+			            ElementDetect.roi_x, ElementDetect.roi_y,
+			            ElementDetect.roi_w, ElementDetect.roi_h,
+			            ElementDetect.white_ratio,
+			            ElementClassName(ElementDetect.class_id));
+		}
 	}
 
 	// if (++draw_line_divider >= 30)
