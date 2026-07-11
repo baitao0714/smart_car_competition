@@ -348,6 +348,12 @@ void Motor_Control(void) {
 			Speed_Goal_l = speed_goal;
 			Speed_Goal_r = speed_goal;
 		}
+		if (ImageStatus.Left_Line == 0 && ImageStatus.Right_Line == 0 &&
+		    abs(ImageStatus.Det_True - ImageStatus.MiddleLine) < 3) // 偏差 < 3
+		{
+			Speed_Goal_l += 30;
+			Speed_Goal_r += 30;
+		}
 	}
 
 	// // [MOD] 外环每2次循环执行一次（降频为原来的1/2）

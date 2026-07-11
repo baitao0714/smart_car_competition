@@ -90,9 +90,9 @@ int Point_Xsite, Point_Ysite;               // 顶点坐标
 int Repair_Point_Xsite, Repair_Point_Ysite; // 修复点坐标
 uint8_t* binar;                             // 灰度图像数组指针
 
-float Diff_delta = 2.5f;   // 圆环差速P增量
+float Diff_delta = 3.0f;   // 圆环差速P增量
 float speed_delta = 1.0f;  // 圆环速度p减小量
-int speed_goal_delta = 10; // 圆环目标速度减小量
+int speed_goal_delta = 20; // 圆环目标速度减小量
 
 // uint8 Half_Road_Wide[60] = // 直道半宽度
 //     {
@@ -2243,14 +2243,14 @@ void Element_Handle_Left_Rings() {
 		//                break;
 		//            }
 		//        }
-		for (int Ysite = 57; Ysite > Repair_Point_Ysite - 3; Ysite--) // 补线
+		for (int Ysite = 42; Ysite > Repair_Point_Ysite - 3; Ysite--) // 补线
 		{
 			//            ImageDeal[Ysite].RightBorder =
 			//            (ImageDeal[58].RightBorder - Repair_Point_Xsite) *
 			//            (Ysite - 58) / (58 - Repair_Point_Ysite)  +
 			//            ImageDeal[58].RightBorder;
 			ImageDeal[Ysite].RightBorder =
-			    ImageDeal[Ysite].LeftBorder + Half_Bend_Wide[Ysite];
+			    ImageDeal[Ysite].LeftBorder + 2 * Half_Bend_Wide[Ysite];
 			if (ImageDeal[Ysite].RightBorder > 77) {
 				ImageDeal[Ysite].RightBorder = 77;
 			}
@@ -2288,7 +2288,7 @@ void Element_Handle_Left_Rings() {
 	// 已出环 切内线
 	if (ImageFlag.image_element_rings_flag == 9 ||
 	    ImageFlag.image_element_rings_flag == 10) {
-		for (int Ysite = 59; Ysite > ImageStatus.OFFLine; Ysite--) {
+		for (int Ysite = 42; Ysite > ImageStatus.OFFLine; Ysite--) {
 			ImageDeal[Ysite].Center =
 			    ImageDeal[Ysite].RightBorder - Half_Road_Wide[Ysite];
 		}
@@ -2522,7 +2522,7 @@ void Element_Handle_Right_Rings() {
 		//                break;
 		//            }
 		//        }
-		for (int Ysite = 57; Ysite > Repair_Point_Ysite - 3; Ysite--) // 补线
+		for (int Ysite = 42; Ysite > Repair_Point_Ysite - 3; Ysite--) // 补线
 		{
 			//            ImageDeal[Ysite].LeftBorder =
 			//            (ImageDeal[58].LeftBorder - Repair_Point_Xsite) *
@@ -2531,7 +2531,7 @@ void Element_Handle_Right_Rings() {
 			// if(ImageDeal[Ysite].LeftBorder<3){ImageDeal[Ysite].LeftBorder =
 			// 3;}
 			ImageDeal[Ysite].LeftBorder =
-			    ImageDeal[Ysite].RightBorder - Half_Bend_Wide[Ysite];
+			    ImageDeal[Ysite].RightBorder - 2 * Half_Bend_Wide[Ysite];
 			if (ImageDeal[Ysite].LeftBorder < 3) {
 				ImageDeal[Ysite].LeftBorder = 3;
 			}
@@ -2542,7 +2542,7 @@ void Element_Handle_Right_Rings() {
 	}
 	// 已出环 切内线
 	if (ImageFlag.image_element_rings_flag == 9) {
-		for (int Ysite = 59; Ysite > ImageStatus.OFFLine; Ysite--) {
+		for (int Ysite = 42; Ysite > ImageStatus.OFFLine; Ysite--) {
 			ImageDeal[Ysite].Center =
 			    ImageDeal[Ysite].LeftBorder + Half_Road_Wide[Ysite];
 		}

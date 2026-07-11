@@ -129,10 +129,12 @@ int car_runtime_motor_init_duty = 1000;
 static int g_detour_mode = 0;
 static std::chrono::steady_clock::time_point g_detour_start;
 static std::chrono::steady_clock::time_point g_straight_start;
-static int g_detour_cooldown = 0;            // 冷却帧数，防止重复触发
-static const int kDetourDurationMs = 1000;   // 绕行持续时间(毫秒)
+static int g_detour_cooldown = 600;          // 冷却帧数，防止重复触发
+static const int kDetourDurationMs = 2000;   // 绕行持续时间(毫秒)
 static const int kStraightDurationMs = 1000; // 直行压过持续时间(毫秒)
 static const int kDetourCooldown = 60;       // 绕行结束后的冷却帧数
+static const int kDetourSpeedDelta = 30;     // 绕行时速度减小量
+static const float kDetourKpDelta = 2.0f;    // 绕行时差速P减小量
 
 static void ApplyDetourControl() {
 	auto now = std::chrono::steady_clock::now();
@@ -156,6 +158,9 @@ static void ApplyDetourControl() {
 	if (ElementDetect.route_mode != 0 && !detour_active && !straight_active &&
 	    g_detour_cooldown <= 0) {
 
+		printf("DETOUR-TRIG: cooldown=%d route_mode=%d class_id=%d\n",
+		       g_detour_cooldown, ElementDetect.route_mode,
+		       ElementDetect.class_id);
 		int class_id = ElementDetect.class_id;
 		std::printf("Detour: element class=%d route_mode=%d\n", class_id,
 		            ElementDetect.route_mode);
@@ -164,12 +169,18 @@ static void ApplyDetourControl() {
 			// weapon: 左侧绕行，跟左线
 			g_detour_mode = 1;
 			g_detour_start = now;
+			Speed_Goal_l -= kDetourSpeedDelta;
+			Speed_Goal_r -= kDetourSpeedDelta;
+			Diff_Kp -= kDetourKpDelta;
 			std::printf("Detour: weapon -> follow LEFT line for %d ms\n",
 			            kDetourDurationMs);
 		} else if (class_id == 0) {
 			// supplies: 右侧绕行，跟右线
 			g_detour_mode = 2;
 			g_detour_start = now;
+			Speed_Goal_l -= kDetourSpeedDelta;
+			Speed_Goal_r -= kDetourSpeedDelta;
+			Diff_Kp -= kDetourKpDelta;
 			std::printf("Detour: supplies -> follow RIGHT line for %d ms\n",
 			            kDetourDurationMs);
 		} else if (class_id == 1) {
@@ -206,21 +217,43 @@ static void ApplyDetourControl() {
 			    (long long)elapsed, kDetourCooldown);
 			g_detour_mode = 0;
 			g_detour_cooldown = kDetourCooldown;
+			Speed_Goal_l += kDetourSpeedDelta;
+			Speed_Goal_r += kDetourSpeedDelta;
+			Diff_Kp += kDetourKpDelta;
 			ElementDetect.route_mode = 0;
 			ElementDetect.class_id = 0;
 			SystemData.Model = 0;
 		} else {
-			// 绕行期间：不跟线，直接用固定偏差驱动差速，避免被邻道干扰
-			// 偏差方向：左绕→负偏差(左转)，右绕→正偏差(右转)
-			int forced_err = (g_detour_mode == 1) ? -8 : 8;
-			ImageStatus.Det_True = (int)ImageStatus.MiddleLine + forced_err;
+			// 绕行期间：基于实际边界计算中线
+			int tp = ImageStatus.TowPoint_True;
+			if (tp < ImageStatus.OFFLine + 1)
+				tp = ImageStatus.OFFLine + 1;
+			if (tp > 49)
+				tp = 49;
+			if (g_detour_mode == 1) {
+				// weapon: 跟左线
+				ImageDeal[tp].Center = ImageDeal[tp].LeftBorder + 5;
+			} else {
+				// supplies: 跟右线
+				ImageDeal[tp].Center = ImageDeal[tp].RightBorder - 5;
+			}
+			// 逐行更新中线
+			for (int y = 59; y > ImageStatus.OFFLine; y--) {
+				if (g_detour_mode == 1)
+					ImageDeal[y].Center = ImageDeal[y].LeftBorder + 5;
+				else
+					ImageDeal[y].Center = ImageDeal[y].RightBorder - 5;
+			}
 
+			GetDet();
 			// 每秒打印一次绕行状态
 			static auto last_detour_log = std::chrono::steady_clock::now();
 			if (elapsed > 0 && elapsed % 1000 < 50) {
 				last_detour_log = now;
-				std::printf("Detour[%lldms]: mode=%d forcedErr=%d\n",
-				            (long long)elapsed, g_detour_mode, forced_err);
+				std::printf("Detour[%lldms]: mode=%d L=%d R=%d C=%d\n",
+				            (long long)elapsed, g_detour_mode,
+				            ImageDeal[tp].LeftBorder, ImageDeal[tp].RightBorder,
+				            ImageDeal[tp].Center);
 			}
 		}
 	}
@@ -318,7 +351,7 @@ bool CarRuntime_RunCameraLoop(
 		const char* CROP_TARGET_IP = udp_crop_target_ip;
 
 		udp_client_raw.udp_client_init(RAW_TARGET_IP, udp_target_port);
-		udp_ready_raw = false; // disabled
+		udp_ready_raw = true; // disabled
 		if (!udp_ready_raw) {
 			lq_log_error("UDP raw stream init failed: %s:%u", RAW_TARGET_IP,
 			             udp_target_port);

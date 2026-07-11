@@ -260,3 +260,4 @@ extern float Speed_P_l;
 extern float Speed_P_r;
 extern int Speed_Goal_l;
 extern int Speed_Goal_r;
+void GetDet(void);
