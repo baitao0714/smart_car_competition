@@ -351,7 +351,7 @@ bool CarRuntime_RunCameraLoop(
 		const char* CROP_TARGET_IP = udp_crop_target_ip;
 
 		udp_client_raw.udp_client_init(RAW_TARGET_IP, udp_target_port);
-		udp_ready_raw = true; // disabled
+		udp_ready_raw = false; // disabled
 		if (!udp_ready_raw) {
 			lq_log_error("UDP raw stream init failed: %s:%u", RAW_TARGET_IP,
 			             udp_target_port);
@@ -361,7 +361,7 @@ bool CarRuntime_RunCameraLoop(
 		}
 
 		udp_client_crop.udp_client_init(CROP_TARGET_IP, udp_target_port);
-		udp_ready_crop = (udp_client_crop.get_udp_socket_fd() >= 0);
+		// udp_ready_crop = (udp_client_crop.get_udp_socket_fd() >= 0);
 		if (!udp_ready_crop) {
 			lq_log_error("UDP crop stream init failed: %s:%u", CROP_TARGET_IP,
 			             udp_target_port);

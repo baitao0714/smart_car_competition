@@ -92,7 +92,7 @@ uint8_t* binar;                             // 灰度图像数组指针
 
 float Diff_delta = 3.0f;   // 圆环差速P增量
 float speed_delta = 1.0f;  // 圆环速度p减小量
-int speed_goal_delta = 20; // 圆环目标速度减小量
+int speed_goal_delta = 10; // 圆环目标速度减小量
 
 // uint8 Half_Road_Wide[60] = // 直道半宽度
 //     {
