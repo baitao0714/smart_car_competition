@@ -124,6 +124,11 @@ bool car_runtime_initialized = false;
 bool car_runtime_motor_enabled = false;
 int car_runtime_motor_init_duty = 1000;
 
+// ====== K0 按键使能位 ======
+// K0 按下(PIN_44 低电平)后，小车才开始运行
+static bool g_car_enabled_by_key = false;
+static std::unique_ptr<ls_gpio> g_k0_button;
+
 // ====== NCNN 检测绕行状态 ======
 // detour_mode: 0=正常循中线, 1=武器左绕(跟左线), 2=物资右绕(跟右线)
 static int g_detour_mode = 0;
@@ -265,6 +270,10 @@ void CarRuntime_Init(bool enable_motor, int motor_init_duty) {
 	car_runtime_motor_enabled = enable_motor;
 	car_runtime_motor_init_duty = motor_init_duty;
 
+	// 初始化 K0 按键 GPIO (PIN_44, 输入模式)
+	g_k0_button = std::make_unique<ls_gpio>(PIN_44, GPIO_MODE_IN);
+	g_car_enabled_by_key = false;
+
 	if (enable_motor) {
 		Motor_Init1(motor_init_duty);
 		Motor_Argument();
@@ -282,6 +291,9 @@ void CarRuntime_Shutdown(bool disable_motor) {
 	if (disable_motor && car_runtime_motor_enabled) {
 		Motor_Disable1();
 	}
+
+	g_k0_button.reset();
+	g_car_enabled_by_key = false;
 
 	cleanup();
 	car_runtime_initialized = false;
@@ -303,7 +315,15 @@ bool CarRuntime_ProcessFrame(const cv::Mat& frame, bool enable_motor) {
 	// 应用 NCNN 检测结果的绕行控制
 	ApplyDetourControl();
 
-	if (enable_motor) {
+	// K0 按键使能检测：按下(PIN_44低电平)后小车才开始运行
+	if (!g_car_enabled_by_key && g_k0_button) {
+		if (g_k0_button->gpio_level_get() == GPIO_LOW) {
+			g_car_enabled_by_key = true;
+			printf("K0 button pressed, car enabled!\n");
+		}
+	}
+
+	if (enable_motor && g_car_enabled_by_key) {
 		Motor_Control();
 	}
 
