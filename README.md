@@ -1,6 +1,7 @@
 # 第二十一届智能车竞赛走马观碑组别
 ---
 <img width="480" height="270" alt="Image" src="https://github.com/user-attachments/assets/36e81eb2-96da-44b5-9ee9-e0af3de8522c" />
+
 ## 目录结构
 
 ```
